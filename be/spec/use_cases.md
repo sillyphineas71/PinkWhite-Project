@@ -12,7 +12,7 @@ Dưới đây là danh sách tổng hợp khoảng 90+ Use Cases cho một hệ 
 - **UC006**: Yêu cầu khôi phục mật khẩu (Forgot Password)
 - **UC007**: Thực thi khôi phục mật khẩu (Reset Password)
 - **UC008**: Thay đổi mật khẩu khi đang đăng nhập (Change Password)
-- **UC009**: Đăng ký / Đăng nhập bằng Google OAuth (`auth-uc009-google-oauth.md`)
+- **UC009**: Đăng ký / Đăng nhập bằng Google OAuth (`auth/auth-uc009-google-oauth.md`)
 - ~~**UC010**: Facebook OAuth~~ (Đã loại khỏi scope)
 - ~~**UC011**: Apple ID~~ (Đã loại khỏi scope)
 - **UC012**: Xóa tài khoản (Soft Delete)
