@@ -1,51 +1,69 @@
 # UC005: Xác thực Email (Verify Email)
 
-> **Revision**: v2 — 2026-05-06. Cập nhật theo kết quả review BA:
-> - Hủy token cũ khi sinh token mới (Q6).
-> - Sau khi verify thành công, cấp JWT lần đầu tiên (Q7).
+> **Revision**: v3 — 2026-05-06. Nâng cấp Production-Grade.
 
 ## 1. Context & Goal
-Tính năng xác thực email ngay sau khi đăng ký (UC001). Đây là bước BẮT BUỘC trước khi user được cấp JWT và sử dụng ứng dụng. Hệ thống gửi email chứa mã OTP hoặc link xác thực, user phải xác nhận để kích hoạt tài khoản.
+Xác thực email ngay sau đăng ký (UC001). Bước BẮT BUỘC trước khi user được cấp JWT.
 
 ## 2. Actors & Roles
-- Unverified User: Người vừa đăng ký tài khoản, chưa xác thực email, chưa có JWT.
+- Unverified User: Chưa xác thực email, chưa có JWT.
 
 ## 3. Out of Scope (Non-goals)
 - Dùng SMS OTP.
 
 ## 4. Data Model Impact
-Thêm model `VerificationToken`:
 ```prisma
 model VerificationToken {
   id        String   @id @default(uuid())
   email     String
-  token     String   @unique
+  tokenHash String   @unique  // Lưu SHA-256 hash, KHÔNG lưu plain-text
   expiresAt DateTime
   createdAt DateTime @default(now())
+
+  @@index([email])
+  @@index([expiresAt])
 }
 ```
-Cập nhật cột `isEmailVerified` trong bảng `User` (đã khai báo ở UC001).
 
-## 5. Non-functional Requirements (Security, Performance)
-- **Security**: Token là chuỗi ngẫu nhiên crypto-secure, thời hạn 15 phút, chỉ dùng 1 lần. Khi sinh token mới, token cũ bị hủy ngay lập tức.
-- **Performance**: Gửi email qua Background Job (Message Queue) để không block HTTP request.
+## 5. Non-functional Requirements
+
+### 5.1 Performance SLA
+| Metric | Target |
+|---|---|
+| Request API (p95) | ≤ 200ms |
+| Confirm API (p95) | ≤ 300ms |
+| DB Write/Delete | ≤ 30ms |
+| JWT Sign (khi confirm) | ≤ 5ms |
+| Email Job Enqueue | ≤ 10ms |
+
+### 5.2 Security
+- Token là chuỗi crypto-secure 32 ký tự. Lưu dạng **SHA-256 hash** trong DB (không lưu plain-text).
+- TTL: 15 phút. Chỉ dùng 1 lần. Token cũ bị hủy khi sinh mới.
+- Confirm API phải dùng **database transaction** (delete token + update user) để chống race condition.
+
+### 5.3 Observability
+- Log `INFO`: `{ action: "EMAIL_VERIFIED", userId, timestamp }` khi xác thực thành công.
+- Log `WARN`: `{ action: "VERIFY_TOKEN_INVALID", email (masked), ip, timestamp }` khi token sai/hết hạn.
 
 ## 6. Functional Requirements & Business Rules
-- THE hệ thống SHALL sinh ra một chuỗi token duy nhất dài 32 ký tự bằng thuật toán crypto-secure.
-- THE hệ thống SHALL giới hạn thời gian sống của token là 15 phút.
-- WHEN sinh token mới cho cùng một email, THE hệ thống SHALL xóa (invalidate) tất cả token cũ của email đó trước khi tạo token mới.
-- THE hệ thống SHALL gửi email chứa link/mã xác thực qua Background Job.
-- WHEN xác thực thành công, THE hệ thống SHALL cấp Access Token và Refresh Token (JWT) cho user lần đầu tiên.
-- API Impact:
-  - `POST /api/auth/verify-email/request` (Body: `{ email }`) — Gửi/gửi lại email xác thực.
-  - `POST /api/auth/verify-email/confirm` (Body: `{ email, token }`) — Xác nhận token.
+- THE hệ thống SHALL sinh token crypto-secure 32 ký tự.
+- THE hệ thống SHALL hash token bằng SHA-256 trước khi lưu DB.
+- WHEN sinh token mới, THE hệ thống SHALL xóa tất cả token cũ của email đó trước.
+- THE hệ thống SHALL gửi email qua Background Job.
+- WHEN confirm thành công, THE hệ thống SHALL cấp Access Token (15p) + Refresh Token (7d) lần đầu.
+- THE hệ thống SHALL wrap thao tác confirm trong **transaction** (xóa token + update `isEmailVerified` + tạo Session).
+- API:
+  - `POST /api/auth/verify-email/request` (Body: `{ email }`)
+  - `POST /api/auth/verify-email/confirm` (Body: `{ email, token }`)
 
 ## 7. Acceptance Criteria
-- WHEN unverified user gọi API `/api/auth/verify-email/request`, THE hệ thống SHALL hủy token cũ (nếu có), tạo token mới, đưa job gửi email vào hàng đợi và trả về HTTP 200.
-- WHEN unverified user gọi API `/api/auth/verify-email/confirm` với token hợp lệ, THE hệ thống SHALL cập nhật `isEmailVerified = true`, xóa token, cấp Access Token + Refresh Token qua `Set-Cookie` và trả về HTTP 200.
+- WHEN user gọi request API, THE hệ thống SHALL hủy token cũ, tạo token mới, enqueue email job và trả về HTTP 200 trong **≤ 200ms (p95)**.
+- WHEN user gọi confirm API với token hợp lệ, THE hệ thống SHALL cập nhật `isEmailVerified = true`, cấp JWT và trả về HTTP 200 trong **≤ 300ms (p95)**.
 
 ## 8. Error Handling (Edge Cases & Sad Paths)
-- WHERE token cung cấp đã hết hạn hoặc không tồn tại, THE hệ thống SHALL trả về HTTP 400 (Bad Request) kèm thông báo "Token không hợp lệ hoặc đã hết hạn".
-- WHERE user yêu cầu gửi lại email xác thực quá 3 lần trong 1 giờ, THE hệ thống SHALL trả về HTTP 429 (Too Many Requests).
-- WHERE email đã được xác thực trước đó, THE hệ thống SHALL trả về HTTP 400 (Bad Request) kèm thông báo "Email đã được xác thực".
-- WHERE email không tồn tại trong hệ thống, THE hệ thống SHALL trả về HTTP 404 (Not Found).
+- WHERE token hết hạn hoặc không tồn tại → HTTP 400 "Token không hợp lệ hoặc đã hết hạn".
+- WHERE gửi lại email quá 3 lần/giờ → HTTP 429.
+- WHERE email đã xác thực trước đó → HTTP 400 "Email đã được xác thực".
+- WHERE email không tồn tại → HTTP 404.
+- WHERE hai request confirm cùng lúc (race condition), THE hệ thống SHALL dùng transaction + row locking, chỉ 1 request thành công, request còn lại nhận HTTP 400.
+- WHERE DB transaction thất bại → rollback, log `ERROR`, trả HTTP 500.
