@@ -48,6 +48,60 @@ class EnvironmentVariables {
   @IsString()
   REDIS_PASSWORD?: string;
 
+  // ===== AUTH =====
+  @IsNotEmpty()
+  @IsString()
+  JWT_ACCESS_SECRET!: string;
+
+  @IsOptional()
+  @IsString()
+  JWT_ACCESS_TTL = '15m';
+
+  @IsNotEmpty()
+  @IsString()
+  JWT_REFRESH_SECRET!: string;
+
+  @IsOptional()
+  @IsString()
+  JWT_REFRESH_TTL = '7d';
+
+  @IsOptional()
+  @IsInt()
+  @Type(() => Number)
+  BCRYPT_ROUNDS = 10;
+
+  // ===== GOOGLE OAUTH =====
+  @IsOptional()
+  @IsString()
+  GOOGLE_CLIENT_ID?: string;
+
+  // ===== EMAIL =====
+  @IsOptional()
+  @IsString()
+  SMTP_HOST = 'smtp.gmail.com';
+
+  @IsOptional()
+  @IsInt()
+  @Type(() => Number)
+  SMTP_PORT = 587;
+
+  @IsOptional()
+  @IsString()
+  SMTP_USER?: string;
+
+  @IsOptional()
+  @IsString()
+  SMTP_PASSWORD?: string;
+
+  @IsOptional()
+  @IsString()
+  SMTP_FROM = 'noreply@yourdomain.com';
+
+  // ===== FRONTEND =====
+  @IsOptional()
+  @IsString()
+  FRONTEND_URL = 'http://localhost:5173';
+
   @IsOptional()
   @IsString()
   FIREBASE_PROJECT_ID?: string;

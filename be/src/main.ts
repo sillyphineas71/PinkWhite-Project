@@ -2,6 +2,8 @@ import { Logger, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const cookieParser = require('cookie-parser');
 import { AppModule } from './app.module';
 
 function parseCorsOrigins(value: string) {
@@ -16,6 +18,7 @@ async function bootstrap() {
   const configService = app.get(ConfigService);
   const port = configService.get<number>('PORT', 3000);
 
+  app.use(cookieParser());
   app.setGlobalPrefix('api');
   app.useGlobalPipes(
     new ValidationPipe({

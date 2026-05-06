@@ -11,6 +11,7 @@ import Redis from 'ioredis';
 export class RedisService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(RedisService.name);
   readonly client: Redis;
+  private connected = false;
 
   constructor(configService: ConfigService) {
     this.client = new Redis({
@@ -18,15 +19,36 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
       lazyConnect: true,
       password: configService.get<string>('REDIS_PASSWORD') || undefined,
       port: configService.get<number>('REDIS_PORT', 6379),
+      maxRetriesPerRequest: 3,
+      retryStrategy: (times: number) => {
+        if (times > 3) {
+          this.logger.warn('Redis unavailable. Running without Redis.');
+          return null; // Stop retrying
+        }
+        return Math.min(times * 200, 1000);
+      },
     });
   }
 
   async onModuleInit() {
-    await this.client.connect();
-    this.logger.log('Redis connected');
+    try {
+      await this.client.connect();
+      this.connected = true;
+      this.logger.log('Redis connected');
+    } catch {
+      this.logger.warn(
+        'Redis connection failed. App will continue without Redis.',
+      );
+    }
+  }
+
+  isConnected(): boolean {
+    return this.connected;
   }
 
   onModuleDestroy() {
-    this.client.disconnect();
+    if (this.connected) {
+      this.client.disconnect();
+    }
   }
 }
