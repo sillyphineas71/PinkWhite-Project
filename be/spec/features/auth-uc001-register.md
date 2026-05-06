@@ -32,7 +32,7 @@ model User {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
-  @@index([email])
+  // email đã có @unique → Prisma tự tạo unique index, KHÔNG cần @@index([email])
   @@index([deletedAt])
 }
 ```

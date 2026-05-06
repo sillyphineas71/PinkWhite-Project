@@ -62,7 +62,7 @@ model VerificationToken {
 
 ## 8. Error Handling (Edge Cases & Sad Paths)
 - WHERE token hết hạn hoặc không tồn tại → HTTP 400 "Token không hợp lệ hoặc đã hết hạn".
-- WHERE gửi lại email quá 3 lần/giờ → HTTP 429.
+- WHERE gửi lại email quá 3 lần/giờ từ cùng 1 **IP + email** → HTTP 429. Ngoài ra, giới hạn tổng **5 lần/giờ cho 1 email** bất kể IP nào (chống email bombing từ nhiều IP).
 - WHERE email đã xác thực trước đó → HTTP 400 "Email đã được xác thực".
 - WHERE email không tồn tại → HTTP 404.
 - WHERE hai request confirm cùng lúc (race condition), THE hệ thống SHALL dùng transaction + row locking, chỉ 1 request thành công, request còn lại nhận HTTP 400.

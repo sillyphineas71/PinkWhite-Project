@@ -67,5 +67,6 @@ Cho phép người dùng đã có tài khoản và đã xác thực email lấy 
 - WHERE tài khoản đang bị khóa (`isBanned = true`), THE hệ thống SHALL trả về HTTP 403.
 - WHERE tài khoản đã bị xóa mềm (`deletedAt != null`), THE hệ thống SHALL trả về HTTP 403.
 - WHERE số lần đăng nhập sai vượt quá 5 lần trong 15 phút từ cùng 1 **IP + email**, THE hệ thống SHALL trả về HTTP 429.
+- WHERE tổng số lần đăng nhập sai vượt quá **20 lần trong 15 phút từ cùng 1 IP** (bất kể email nào), THE hệ thống SHALL block toàn bộ IP đó và trả về HTTP 429 (chống credential stuffing hàng loạt).
 - WHERE payload gửi lên thiếu/sai định dạng, THE hệ thống SHALL trả về HTTP 400 trong vòng **≤ 50ms**.
 - WHERE Database không phản hồi trong vòng **500ms**, THE hệ thống SHALL timeout, ghi log `ERROR` và trả về HTTP 503 (Service Unavailable).
