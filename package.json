@@ -1,0 +1,21 @@
+{
+  "name": "social-matchmaking-platform",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "npm --prefix be run build && npm --prefix fe run build",
+    "db:down": "docker compose down",
+    "db:generate": "npm --prefix be run db:generate",
+    "db:migrate": "npm --prefix be run db:migrate",
+    "db:studio": "npm --prefix be run db:studio",
+    "db:up": "docker compose up -d postgres redis",
+    "dev": "concurrently -n be,fe -c cyan,magenta \"npm run dev:be\" \"npm run dev:fe\"",
+    "dev:be": "npm --prefix be run start:dev",
+    "dev:fe": "npm --prefix fe run dev -- --host 0.0.0.0",
+    "lint": "npm --prefix be run lint && npm --prefix fe run lint",
+    "test": "npm --prefix be run test"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}

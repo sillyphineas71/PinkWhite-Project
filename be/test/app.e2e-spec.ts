@@ -1,0 +1,50 @@
+import { INestApplication } from '@nestjs/common';
+import { Test, TestingModule } from '@nestjs/testing';
+import request from 'supertest';
+import { App } from 'supertest/types';
+import { PrismaService } from '../src/database/prisma.service';
+import { RedisService } from '../src/redis/redis.service';
+import { AppModule } from './../src/app.module';
+
+describe('Health (e2e)', () => {
+  let app: INestApplication<App>;
+
+  beforeEach(async () => {
+    const moduleFixture: TestingModule = await Test.createTestingModule({
+      imports: [AppModule],
+    })
+      .overrideProvider(PrismaService)
+      .useValue({
+        $connect: jest.fn(),
+        $disconnect: jest.fn(),
+      })
+      .overrideProvider(RedisService)
+      .useValue({
+        client: {},
+        onModuleDestroy: jest.fn(),
+        onModuleInit: jest.fn(),
+      })
+      .compile();
+
+    app = moduleFixture.createNestApplication();
+    await app.init();
+  });
+
+  it('/health (GET)', () => {
+    return request(app.getHttpServer())
+      .get('/health')
+      .expect(200)
+      .expect(({ body }) => {
+        expect(body).toEqual(
+          expect.objectContaining({
+            service: 'matchmaking-api',
+            status: 'ok',
+          }),
+        );
+      });
+  });
+
+  afterEach(async () => {
+    await app?.close();
+  });
+});

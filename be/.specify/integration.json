@@ -1,0 +1,9 @@
+{
+  "backend": {
+    "framework": "nestjs",
+    "database": "postgresql",
+    "orm": "prisma",
+    "cache": "redis",
+    "realtime": "socket.io"
+  }
+}

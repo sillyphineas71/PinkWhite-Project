@@ -1,0 +1,6 @@
+{
+  "scope": "backend",
+  "language": "vi-VN",
+  "specRoot": "spec",
+  "implementationRoot": "src"
+}

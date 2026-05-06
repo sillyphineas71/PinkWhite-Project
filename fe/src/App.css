@@ -1,0 +1,161 @@
+.app-shell {
+  min-height: 100vh;
+  padding: 32px;
+}
+
+.topbar {
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  padding-bottom: 20px;
+}
+
+.brand {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+}
+
+.brand-mark {
+  align-items: center;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-border);
+  border-radius: 8px;
+  color: var(--accent);
+  display: inline-flex;
+  height: 40px;
+  justify-content: center;
+  width: 40px;
+}
+
+.brand h1,
+.brand p {
+  margin: 0;
+}
+
+.brand h1 {
+  font-size: 20px;
+  line-height: 1.2;
+}
+
+.brand p,
+.section-copy,
+.module-card p,
+.status-item span {
+  color: var(--muted);
+}
+
+.env-pill {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text);
+  font-size: 13px;
+  padding: 7px 12px;
+}
+
+.workspace {
+  display: grid;
+  gap: 28px;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  padding-top: 28px;
+}
+
+.section-header {
+  margin-bottom: 16px;
+}
+
+.section-header h2 {
+  font-size: 28px;
+  margin: 0 0 8px;
+}
+
+.section-copy {
+  margin: 0;
+  max-width: 760px;
+}
+
+.module-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.module-card,
+.status-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.module-card {
+  padding: 18px;
+}
+
+.module-icon {
+  align-items: center;
+  background: var(--icon-bg);
+  border-radius: 8px;
+  color: var(--icon);
+  display: inline-flex;
+  height: 36px;
+  justify-content: center;
+  margin-bottom: 16px;
+  width: 36px;
+}
+
+.module-card h3,
+.module-card p {
+  margin: 0;
+}
+
+.module-card h3 {
+  font-size: 16px;
+  margin-bottom: 8px;
+}
+
+.status-panel {
+  align-self: start;
+  padding: 18px;
+}
+
+.status-panel h2 {
+  font-size: 18px;
+  margin: 0 0 14px;
+}
+
+.status-list {
+  display: grid;
+  gap: 12px;
+}
+
+.status-item {
+  display: grid;
+  gap: 2px;
+}
+
+.status-item strong {
+  font-size: 14px;
+}
+
+.status-item span {
+  font-size: 13px;
+}
+
+@media (max-width: 860px) {
+  .app-shell {
+    padding: 20px;
+  }
+
+  .topbar,
+  .workspace {
+    display: grid;
+    gap: 18px;
+    grid-template-columns: 1fr;
+  }
+
+  .module-grid {
+    grid-template-columns: 1fr;
+  }
+}
