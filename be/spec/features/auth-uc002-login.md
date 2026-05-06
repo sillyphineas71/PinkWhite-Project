@@ -1,10 +1,8 @@
 # UC002: Login via Email (Đăng nhập)
 
-> **Revision**: v3 — 2026-05-06. Nâng cấp Production-Grade:
-> - Thêm Performance SLA.
-> - Thêm Timing Attack protection.
-> - Thêm Observability.
-> - Thêm Error Response Schema.
+> **Revision**: v3.1 — 2026-05-06T14:42+07:00.
+> - v3 Production-Grade: Performance SLA, Timing Attack, Observability.
+> - v3.1: Cho phép user bị soft-delete đăng nhập với cờ `pendingRestore` (Q6).
 
 ## 1. Context & Goal
 Cho phép người dùng đã có tài khoản và đã xác thực email lấy lại phiên làm việc thông qua Access Token (ngắn hạn) và Refresh Token (dài hạn).
@@ -65,7 +63,8 @@ Cho phép người dùng đã có tài khoản và đã xác thực email lấy 
 - WHERE email hoặc password không khớp, THE hệ thống SHALL trả về HTTP 401 kèm thông báo "Email hoặc mật khẩu không chính xác" trong thời gian phản hồi **≥ 300ms** (đảm bảo constant-time).
 - WHERE email chưa được xác thực (`isEmailVerified = false`), THE hệ thống SHALL trả về HTTP 403 kèm thông báo "Vui lòng xác thực email trước khi đăng nhập".
 - WHERE tài khoản đang bị khóa (`isBanned = true`), THE hệ thống SHALL trả về HTTP 403.
-- WHERE tài khoản đã bị xóa mềm (`deletedAt != null`), THE hệ thống SHALL trả về HTTP 403.
+- WHERE tài khoản đã bị xóa mềm (`deletedAt != null` và chưa quá 30 ngày), THE hệ thống SHALL cho phép đăng nhập nhưng response kèm cờ `pendingRestore: true`. Mọi API khác (ngoài `/restore` và `/logout`) phải trả HTTP 403 cho user ở trạng thái này.
+- WHERE tài khoản đã bị xóa mềm quá 30 ngày → HTTP 410 (Gone).
 - WHERE số lần đăng nhập sai vượt quá 5 lần trong 15 phút từ cùng 1 **IP + email**, THE hệ thống SHALL trả về HTTP 429.
 - WHERE tổng số lần đăng nhập sai vượt quá **20 lần trong 15 phút từ cùng 1 IP** (bất kể email nào), THE hệ thống SHALL block toàn bộ IP đó và trả về HTTP 429 (chống credential stuffing hàng loạt).
 - WHERE payload gửi lên thiếu/sai định dạng, THE hệ thống SHALL trả về HTTP 400 trong vòng **≤ 50ms**.
