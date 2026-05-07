@@ -25,7 +25,7 @@ Dưới đây là danh sách tổng hợp khoảng 90+ Use Cases cho một hệ 
 - **UC016**: Tạo thông tin cá nhân cơ bản (Tên, Tuổi, Giới tính) lúc Onboarding
 - **UC017**: Đọc thông tin cá nhân cơ bản
 - **UC018**: Cập nhật thông tin cá nhân cơ bản
-- **UC019**: Xóa thông tin cá nhân cơ bản (chuyển về mặc định)
+- ~~**UC019**: Xóa thông tin cá nhân cơ bản (chuyển về mặc định)~~ (Đã loại khỏi scope)
 - **UC020**: Tải lên ảnh đại diện (Upload tới S3/Cloudinary)
 - **UC021**: Đọc danh sách ảnh đại diện (Gallery)
 - **UC022**: Cập nhật thứ tự hiển thị của ảnh đại diện
@@ -35,8 +35,8 @@ Dưới đây là danh sách tổng hợp khoảng 90+ Use Cases cho một hệ 
 - **UC026**: Cập nhật vị trí hiện tại (GPS Coordinates)
 - **UC027**: Đọc vị trí hiện tại
 - **UC028**: Cập nhật vị trí tùy chỉnh (Tính năng Passport - Premium)
-- **UC029**: Gửi yêu cầu xác thực khuôn mặt (KYC - Upload Selfie)
-- **UC030**: Đọc trạng thái xác thực khuôn mặt (Verified Blue Tick)
+- ~~**UC029**: Gửi yêu cầu xác thực khuôn mặt (KYC - Upload Selfie)~~ (Đã loại khỏi scope)
+- ~~**UC030**: Đọc trạng thái xác thực khuôn mặt (Verified Blue Tick)~~ (Đã loại khỏi scope)
 - **UC031**: Cập nhật thông tin Học vấn / Nghề nghiệp
 - **UC032**: Đọc thông tin Học vấn / Nghề nghiệp
 - **UC033**: Cập nhật Lifestyle (Hút thuốc, Uống rượu, Thú cưng...)
