@@ -58,9 +58,7 @@ export class SessionRepository {
         count++;
       }
     }
-    this.logger.debug(
-      `[MOCK] Deleted ${count} sessions for user: ${userId}`,
-    );
+    this.logger.debug(`[MOCK] Deleted ${count} sessions for user: ${userId}`);
     return count;
   }
 

@@ -53,7 +53,10 @@ export class UserRepository {
     return user ? { ...user } : null;
   }
 
-  async updatePasswordHash(id: string, passwordHash: string | null): Promise<void> {
+  async updatePasswordHash(
+    id: string,
+    passwordHash: string | null,
+  ): Promise<void> {
     const user = this.users.get(id);
     if (user) {
       user.passwordHash = passwordHash;
@@ -83,6 +86,14 @@ export class UserRepository {
     const user = this.users.get(id);
     if (user) {
       user.deletedAt = null;
+      user.updatedAt = new Date();
+    }
+  }
+
+  async setIsOnboarded(id: string, value: boolean): Promise<void> {
+    const user = this.users.get(id);
+    if (user) {
+      user.isOnboarded = value;
       user.updatedAt = new Date();
     }
   }

@@ -23,7 +23,8 @@ export class TokenService {
       { ...payload },
       {
         secret: this.configService.getOrThrow<string>('JWT_ACCESS_SECRET'),
-        expiresIn: (this.configService.get<string>('JWT_ACCESS_TTL') ?? '15m') as any,
+        expiresIn: (this.configService.get<string>('JWT_ACCESS_TTL') ??
+          '15m') as any,
       },
     );
   }
@@ -36,7 +37,8 @@ export class TokenService {
       { ...payload },
       {
         secret: this.configService.getOrThrow<string>('JWT_REFRESH_SECRET'),
-        expiresIn: (this.configService.get<string>('JWT_REFRESH_TTL') ?? '7d') as any,
+        expiresIn: (this.configService.get<string>('JWT_REFRESH_TTL') ??
+          '7d') as any,
       },
     );
   }
@@ -55,7 +57,11 @@ export class TokenService {
    * Access Cookie: Path=/
    * Refresh Cookie: Path=/api/auth/refresh
    */
-  setAuthCookies(res: Response, accessToken: string, refreshToken: string): void {
+  setAuthCookies(
+    res: Response,
+    accessToken: string,
+    refreshToken: string,
+  ): void {
     const isProduction = this.configService.get('NODE_ENV') === 'production';
 
     res.cookie('access_token', accessToken, {

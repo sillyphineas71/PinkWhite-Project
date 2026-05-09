@@ -9,7 +9,10 @@ import { JwtPayload } from '../services/token.service';
  * Extract JWT từ cookie "access_token" — ADR-004
  */
 @Injectable()
-export class JwtAccessStrategy extends PassportStrategy(Strategy, 'jwt-access') {
+export class JwtAccessStrategy extends PassportStrategy(
+  Strategy,
+  'jwt-access',
+) {
   constructor(configService: ConfigService) {
     super({
       jwtFromRequest: ExtractJwt.fromExtractors([

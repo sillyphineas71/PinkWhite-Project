@@ -8,6 +8,7 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { RedisModule } from './redis/redis.module';
 import { RealtimeModule } from './realtime/realtime.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { ProfileModule } from './modules/profile/profile.module';
 
 @Module({
   imports: [
@@ -18,7 +19,7 @@ import { AuthModule } from './modules/auth/auth.module';
     ThrottlerModule.forRoot([
       {
         ttl: 60000, // 1 minute
-        limit: 60,  // 60 requests per minute (global default)
+        limit: 60, // 60 requests per minute (global default)
       },
     ]),
     DatabaseModule,
@@ -27,7 +28,7 @@ import { AuthModule } from './modules/auth/auth.module';
     HealthModule,
     RealtimeModule,
     AuthModule,
+    ProfileModule,
   ],
 })
 export class AppModule {}
-

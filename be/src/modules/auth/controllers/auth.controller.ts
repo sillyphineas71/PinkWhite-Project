@@ -87,7 +87,9 @@ export class AuthController {
 
   // UC005: Verify Email — Confirm
   @Post('verify-email/confirm')
-  @ApiOperation({ summary: 'Xác nhận email bằng token (Bước 2 - Lấy token từ terminal log)' })
+  @ApiOperation({
+    summary: 'Xác nhận email bằng token (Bước 2 - Lấy token từ terminal log)',
+  })
   @HttpCode(HttpStatus.OK)
   async verifyEmailConfirm(
     @Body() dto: VerifyEmailConfirmDto,
@@ -107,7 +109,9 @@ export class AuthController {
 
   // UC007: Reset Password
   @Post('reset-password')
-  @ApiOperation({ summary: 'Đặt lại mật khẩu bằng token (Lấy token từ terminal log)' })
+  @ApiOperation({
+    summary: 'Đặt lại mật khẩu bằng token (Lấy token từ terminal log)',
+  })
   @HttpCode(HttpStatus.OK)
   async resetPassword(@Body() dto: ResetPasswordDto) {
     return this.authService.resetPassword(dto.token, dto.newPassword);
@@ -133,7 +137,9 @@ export class AuthController {
   // UC012: Soft Delete Account
   @Post('account/delete')
   @ApiCookieAuth()
-  @ApiOperation({ summary: 'Xóa tài khoản mềm (Yêu cầu Cookie & Mật khẩu xác nhận)' })
+  @ApiOperation({
+    summary: 'Xóa tài khoản mềm (Yêu cầu Cookie & Mật khẩu xác nhận)',
+  })
   @UseGuards(JwtAccessGuard)
   @HttpCode(HttpStatus.OK)
   async deleteAccount(
@@ -156,7 +162,9 @@ export class AuthController {
 
   // UC014: Refresh Token
   @Post('refresh')
-  @ApiOperation({ summary: 'Làm mới Access Token (Trình duyệt tự gửi refresh_token cookie)' })
+  @ApiOperation({
+    summary: 'Làm mới Access Token (Trình duyệt tự gửi refresh_token cookie)',
+  })
   @HttpCode(HttpStatus.OK)
   async refreshToken(
     @Req() req: express.Request,

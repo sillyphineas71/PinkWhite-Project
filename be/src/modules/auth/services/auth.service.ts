@@ -181,7 +181,11 @@ export class AuthService {
     }
     this.tokenService.clearAuthCookies(res);
     this.logger.log(
-      JSON.stringify({ action: 'LOGOUT', userId, timestamp: new Date().toISOString() }),
+      JSON.stringify({
+        action: 'LOGOUT',
+        userId,
+        timestamp: new Date().toISOString(),
+      }),
     );
     return { message: 'Đăng xuất thành công' };
   }
@@ -304,8 +308,7 @@ export class AuthService {
     // Always return 200 to prevent user enumeration
     if (!user) {
       return {
-        message:
-          'Nếu email tồn tại, bạn sẽ nhận được link đặt lại mật khẩu.',
+        message: 'Nếu email tồn tại, bạn sẽ nhận được link đặt lại mật khẩu.',
       };
     }
 
@@ -442,7 +445,7 @@ export class AuthService {
         await this.userRepo.setEmailVerified(normalized);
         await this.userRepo.updatePasswordHash(user.id, null);
         user.isEmailVerified = true;
-        
+
         this.logger.log(
           JSON.stringify({
             action: 'ACCOUNT_TAKOVER_BY_OAUTH',
@@ -485,11 +488,7 @@ export class AuthService {
   }
 
   // ===== UC012: Soft Delete =====
-  async softDeleteAccount(
-    userId: string,
-    password: string,
-    res: Response,
-  ) {
+  async softDeleteAccount(userId: string, password: string, res: Response) {
     const user = await this.userRepo.findById(userId);
     if (!user || !user.passwordHash) {
       throw new UnauthorizedException();
@@ -554,7 +553,11 @@ export class AuthService {
   }
 
   // ===== UC014: Refresh Token =====
-  async refreshAccessToken(refreshTokenCookie: string, res: Response, req: Request) {
+  async refreshAccessToken(
+    refreshTokenCookie: string,
+    res: Response,
+    req: Request,
+  ) {
     if (!refreshTokenCookie) {
       throw new UnauthorizedException();
     }
@@ -567,7 +570,8 @@ export class AuthService {
       // => Dấu hiệu của việc token cũ bị đánh cắp và sử dụng lại!
       let stolenUserId: string | null = null;
       try {
-        const decoded = this.tokenService.verifyRefreshToken(refreshTokenCookie);
+        const decoded =
+          this.tokenService.verifyRefreshToken(refreshTokenCookie);
         stolenUserId = decoded.sub;
       } catch {
         // JWT không hợp lệ hoặc đã hết hạn, không cần thu hồi
@@ -581,7 +585,8 @@ export class AuthService {
             level: 'CRITICAL',
             userId: stolenUserId,
             ip: req.ip,
-            message: 'Thu hồi TOÀN BỘ session do phát hiện tái sử dụng Refresh Token!',
+            message:
+              'Thu hồi TOÀN BỘ session do phát hiện tái sử dụng Refresh Token!',
             timestamp: new Date().toISOString(),
           }),
         );
