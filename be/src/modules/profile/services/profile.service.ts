@@ -15,9 +15,14 @@ import {
   UpdateEducationJobDto,
 } from '../dto/profile.dto';
 
+import { UserRepository } from '../../auth/repositories/user.repository';
+
 @Injectable()
 export class ProfileService {
-  constructor(private readonly profileRepo: ProfileRepository) {}
+  constructor(
+    private readonly profileRepo: ProfileRepository,
+    private readonly userRepo: UserRepository,
+  ) {}
 
   private calculateAge(dob: Date): number {
     const diff_ms = Date.now() - dob.getTime();
@@ -56,13 +61,17 @@ export class ProfileService {
       throw new BadRequestException('Bạn phải đủ 18 tuổi để tham gia');
     }
 
-    return this.profileRepo.create({
+    const profile = await this.profileRepo.create({
       userId,
       fullName: dto.fullName,
       dob: dobDate,
       gender: dto.gender,
       searchGender: dto.searchGender,
     });
+
+    await this.userRepo.setIsOnboarded(userId, true);
+
+    return profile;
   }
 
   async getProfile(userId: string, isSelf: boolean): Promise<any> {

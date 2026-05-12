@@ -81,4 +81,8 @@ export class LocationRepository {
     const location = this.locations.get(userId);
     return location ? { ...location } : null;
   }
+
+  async findAll(): Promise<LocationEntity[]> {
+    return Array.from(this.locations.values()).map(l => ({ ...l }));
+  }
 }

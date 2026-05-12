@@ -9,6 +9,9 @@ import { RedisModule } from './redis/redis.module';
 import { RealtimeModule } from './realtime/realtime.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { ProfileModule } from './modules/profile/profile.module';
+import { DiscoveryModule } from './modules/discovery/discovery.module';
+import { SwipeModule } from './modules/swipe/swipe.module';
+import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
   imports: [
@@ -22,6 +25,7 @@ import { ProfileModule } from './modules/profile/profile.module';
         limit: 60, // 60 requests per minute (global default)
       },
     ]),
+    ScheduleModule.forRoot(),
     DatabaseModule,
     RedisModule,
     NotificationsModule,
@@ -29,6 +33,8 @@ import { ProfileModule } from './modules/profile/profile.module';
     RealtimeModule,
     AuthModule,
     ProfileModule,
+    SwipeModule,
+    DiscoveryModule,
   ],
 })
 export class AppModule {}

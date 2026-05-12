@@ -67,4 +67,8 @@ export class ProfileRepository {
     this.logger.debug(`[MOCK] Profile updated for userId: ${userId}`);
     return { ...profile };
   }
+
+  async findAll(): Promise<ProfileEntity[]> {
+    return Array.from(this.profiles.values()).map(p => ({ ...p }));
+  }
 }

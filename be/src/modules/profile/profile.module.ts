@@ -24,6 +24,12 @@ import { AuthModule } from '../auth/auth.module';
     PhotoRepository,
     LocationRepository,
   ],
-  exports: [ProfileService, LocationService],
+  exports: [
+    ProfileService,
+    LocationService,
+    ProfileRepository,
+    PhotoRepository,
+    LocationRepository,
+  ],
 })
 export class ProfileModule {}

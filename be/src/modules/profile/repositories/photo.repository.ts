@@ -97,4 +97,8 @@ export class PhotoRepository {
       photo.isAvatar = index === 0;
     });
   }
+
+  async findAll(): Promise<PhotoEntity[]> {
+    return Array.from(this.photos.values()).map(p => ({ ...p }));
+  }
 }

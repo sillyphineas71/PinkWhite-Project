@@ -8,6 +8,8 @@ export interface UserEntity {
   isEmailVerified: boolean;
   isOnboarded: boolean;
   isBanned: boolean;
+  isPremium: boolean;
+  isHidden: boolean;
   deletedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -30,6 +32,8 @@ export class UserRepository {
       isEmailVerified: false,
       isOnboarded: false,
       isBanned: false,
+      isPremium: false,
+      isHidden: false,
       deletedAt: null,
       createdAt: now,
       updatedAt: now,
@@ -96,5 +100,17 @@ export class UserRepository {
       user.isOnboarded = value;
       user.updatedAt = new Date();
     }
+  }
+
+  async setIsHidden(id: string, value: boolean): Promise<void> {
+    const user = this.users.get(id);
+    if (user) {
+      user.isHidden = value;
+      user.updatedAt = new Date();
+    }
+  }
+
+  async findAll(): Promise<UserEntity[]> {
+    return Array.from(this.users.values()).map(u => ({ ...u }));
   }
 }
