@@ -73,8 +73,9 @@ enum SwipeAction {
     5. Tạo (hoặc upsert) bản ghi `Swipe` với `action = LIKE`.
     6. Kiểm tra Match: Query xem Target đã Like User trước đó chưa (`WHERE swiperId = targetId AND targetId = swiperId AND action IN (LIKE, SUPER_LIKE)`).
   - IF Target đã Like User trước đó (Mutual Like), THEN hệ thống SHALL:
-    1. Kích hoạt UC056: Tạo bản ghi Match (Mock MatchRepository).
+    1. Kích hoạt UC056: Cố gắng tạo bản ghi Match (Mock MatchRepository). *Lưu ý (Chống Race Condition): DB phải có UNIQUE CONSTRAINT cho cặp (UserA, UserB). Nếu bắt được lỗi Unique Violation, nghĩa là request song song đã tạo Match thành công, bỏ qua lỗi này.*
     2. Trả về response có `isMatch: true` và `matchId`.
+  - *Luồng Self-Healing (Tự phục hồi):* THE hệ thống SHALL có một Cronjob chạy ngầm (ví dụ: mỗi 10 phút) quét các cặp Mutual Like nhưng chưa có bản ghi Match tương ứng trong DB để tự động sinh Match bù (phòng hờ mọi trường hợp rớt mạng, crash server lúc xử lý).
   - IF không phải Mutual Like, THEN hệ thống SHALL trả về `isMatch: false`.
   - THE hệ thống SHALL trả về HTTP 200:
     ```json

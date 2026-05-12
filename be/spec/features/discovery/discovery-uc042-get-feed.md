@@ -64,7 +64,8 @@
        - Target có `isHidden = false` (không ẩn danh — UC045).
        - Target PHẢI có ít nhất 1 Photo.
   - THE hệ thống SHALL sắp xếp kết quả theo thứ tự ưu tiên:
-    1. **Boost Priority:** User mới đăng ký trong vòng **48 giờ** qua SHALL được đẩy lên đầu (New User Boost).
+    1. **Boost Priority:** User mới đăng ký trong vòng **48 giờ** qua SHALL được đẩy lên đầu (New User Boost). 
+       *Lưu ý (Chống Spam):* Để ngăn chặn việc user farm Boost bằng cách xóa/đăng ký lại liên tục, Boost này CHỈ áp dụng nếu Email hoặc DeviceID chưa từng tồn tại trên hệ thống trước đó (không tính các tài khoản tái đăng ký).
     2. **Distance Priority:** Sau đó sắp xếp theo khoảng cách gần nhất (ASC).
   - THE hệ thống SHALL trả về HTTP 200 kèm JSON:
     ```json
