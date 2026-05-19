@@ -11,6 +11,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { ProfileModule } from './modules/profile/profile.module';
 import { DiscoveryModule } from './modules/discovery/discovery.module';
 import { SwipeModule } from './modules/swipe/swipe.module';
+import { MatchModule } from './modules/match/match.module';
 import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
@@ -33,6 +34,7 @@ import { ScheduleModule } from '@nestjs/schedule';
     RealtimeModule,
     AuthModule,
     ProfileModule,
+    MatchModule,
     SwipeModule,
     DiscoveryModule,
   ],

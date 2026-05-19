@@ -4,7 +4,7 @@ import request from 'supertest';
 import { AppModule } from './../src/app.module';
 import { UserRepository } from './../src/modules/auth/repositories/user.repository';
 import cookieParser from 'cookie-parser';
-import { MatchRepository } from '../src/modules/swipe/repositories/match.repository';
+import { MatchRepository } from '../src/modules/match/repositories/match.repository';
 
 describe('SwipeModule (e2e)', () => {
   let app: INestApplication;

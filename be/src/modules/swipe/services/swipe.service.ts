@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { SwipeRepository } from '../repositories/swipe.repository';
-import { MatchRepository } from '../repositories/match.repository';
+import { MatchRepository } from '../../match/repositories/match.repository';
 import { UserRepository } from '../../auth/repositories/user.repository';
 import { ProfileRepository } from '../../profile/repositories/profile.repository';
 import { PhotoRepository } from '../../profile/repositories/photo.repository';
