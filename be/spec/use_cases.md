@@ -82,14 +82,14 @@ Dưới đây là danh sách tổng hợp khoảng 90+ Use Cases cho một hệ 
 ## 6. Realtime Chat & Messaging
 *Trò chuyện qua Socket.IO*
 - **UC063**: Gửi tin nhắn Text
+- **UC063-A**: Typing Indicator ("Đang gõ...")
+- **UC063-B**: Online/Offline Status (Trạng thái hoạt động)
 - **UC064**: Lấy lịch sử tin nhắn của một Match (Phân trang / Cursor)
 - **UC065**: Cập nhật trạng thái tin nhắn (Đã nhận, Đã xem - Read Receipts)
 - **UC066**: Thu hồi tin nhắn (Unsend)
 - **UC067**: Gửi tin nhắn Hình ảnh / GIF
 - **UC068**: Gửi tin nhắn Voice (Ghi âm)
 - **UC069**: Thả cảm xúc (React / Heart) vào một tin nhắn
-- **UC070**: Gọi Audio Call (WebRTC qua Socket signaling)
-- **UC071**: Gọi Video Call
 - **UC072**: Xem danh sách các cuộc trò chuyện gần đây (Inbox Snippet)
 
 ## 7. Monetization & Premium (In-App Purchases)
