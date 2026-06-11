@@ -1,3 +1,78 @@
+# Prisma Schema v1 Draft — Dating / Social Matchmaking Platform
+
+## CHANGELOG & REVISION HISTORY
+
+| Date | Change Summary | Sections Changed |
+|---|---|---|
+| 2026-06-11 | Initial Prisma schema draft from approved PostgreSQL logical schema v1 | Entire file |
+
+---
+
+## 0. Status
+
+This document is a **Prisma schema draft for review**.
+
+Do not copy this directly into `prisma/schema.prisma` until reviewed.
+
+Flow:
+
+```text
+PostgreSQL Logical Schema v1 approved
+→ Prisma Schema v1 Draft
+→ Review Prisma mapping
+→ Update real prisma/schema.prisma
+→ Create migration
+→ Review migration SQL
+→ Apply migration
+```
+
+---
+
+## 1. Important Prisma mapping decisions
+
+### 1.1 UUIDv7
+
+Use Prisma UUIDv7 generation if the project uses Prisma ORM >= 5.18:
+
+```prisma
+id String @id @default(uuid(7)) @db.Uuid
+```
+
+Prisma ORM v5.18 added `uuid(7)` support in the Prisma Schema `uuid()` function. If the installed Prisma version is older, generate UUIDv7 in the application layer instead and remove `@default(uuid(7))` from IDs. citeturn333955view0
+
+### 1.2 PostGIS
+
+PostGIS support in Prisma is version-sensitive. Official docs around PostgreSQL extensions mention `Unsupported` fallback for unsupported extension types and raw SQL requirements, while newer Prisma docs also describe native `Geometry` support. For this project, because the logical schema uses `geography(Point,4326)`, the safe phase-1 approach is:
+
+```prisma
+realLocation     Unsupported("geography(Point,4326)")?
+passportLocation Unsupported("geography(Point,4326)")?
+```
+
+Then handle distance queries and GIST indexes through raw SQL migration/query. Prisma docs note that extension/custom types may be represented as `Unsupported` and queried with raw SQL when not natively supported. citeturn333955view2turn333955view3
+
+### 1.3 Enum strategy
+
+This draft uses Prisma enums for type safety. If the team wants easier enum changes during early development, use `String` + database check constraints instead.
+
+Recommendation for this project:
+
+```text
+Use Prisma enums for clearer agent implementation.
+Review enum changes carefully before migration.
+```
+
+### 1.4 Naming convention
+
+Prisma model fields use camelCase.
+
+Database table/column names use snake_case through `@map` and `@@map`.
+
+---
+
+# 2. Prisma schema draft
+
+```prisma
 generator client {
   provider = "prisma-client-js"
 }
@@ -277,37 +352,35 @@ model User {
   createdAt             DateTime         @default(now()) @map("created_at") @db.Timestamptz
   updatedAt             DateTime         @updatedAt @map("updated_at") @db.Timestamptz
 
-  authIdentities      AuthIdentity[]
-  sessions            UserSession[]
-  securityTokens      SecurityToken[]
-  profile             Profile?
-  photos              ProfilePhoto[]
-  location            UserLocation?
-  discoveryPreference DiscoveryPreference?
-  privacySettings     UserPrivacySettings?
+  authIdentities        AuthIdentity[]
+  sessions              UserSession[]
+  securityTokens        SecurityToken[]
+  profile               Profile?
+  photos                ProfilePhoto[]
+  location              UserLocation?
+  discoveryPreference   DiscoveryPreference?
+  privacySettings       UserPrivacySettings?
 
-  swipeEventsCreated  SwipeEvent[] @relation("SwipeEventsCreated")
-  swipeEventsReceived SwipeEvent[] @relation("SwipeEventsReceived")
-  swipeStatesCreated  SwipeState[] @relation("SwipeStatesCreated")
-  swipeStatesReceived SwipeState[] @relation("SwipeStatesReceived")
+  swipeEventsCreated    SwipeEvent[]     @relation("SwipeEventsCreated")
+  swipeEventsReceived   SwipeEvent[]     @relation("SwipeEventsReceived")
+  swipeStatesCreated    SwipeState[]     @relation("SwipeStatesCreated")
+  swipeStatesReceived   SwipeState[]     @relation("SwipeStatesReceived")
 
-  matchesAsA         Match[]   @relation("MatchesAsA")
-  matchesAsB         Match[]   @relation("MatchesAsB")
-  matchesUnmatchedBy Match[]   @relation("MatchesUnmatchedBy")
-  matchesBlockedBy   Match[]   @relation("MatchesBlockedBy")
-  messages           Message[]
+  matchesAsA            Match[]          @relation("MatchesAsA")
+  matchesAsB            Match[]          @relation("MatchesAsB")
+  messages              Message[]
 
-  blocksCreated   UserBlock[]  @relation("BlocksCreated")
-  blocksReceived  UserBlock[]  @relation("BlocksReceived")
-  reportsCreated  UserReport[] @relation("ReportsCreated")
-  reportsReceived UserReport[] @relation("ReportsReceived")
-  reportsResolved UserReport[] @relation("ReportsResolved")
+  blocksCreated         UserBlock[]      @relation("BlocksCreated")
+  blocksReceived        UserBlock[]      @relation("BlocksReceived")
+  reportsCreated        UserReport[]     @relation("ReportsCreated")
+  reportsReceived       UserReport[]     @relation("ReportsReceived")
+  reportsResolved       UserReport[]     @relation("ReportsResolved")
 
-  paymentOrders PaymentOrder[]
-  subscriptions UserSubscription[]
-  entitlements  UserEntitlement[]
-  notifications Notification[]
-  auditLogs     AuditLog[]
+  paymentOrders         PaymentOrder[]
+  subscriptions         UserSubscription[]
+  entitlements          UserEntitlement[]
+  notifications         Notification[]
+  auditLogs             AuditLog[]
 
   @@index([accountStatus], map: "idx_users_account_status")
   @@index([onboardingStatus], map: "idx_users_onboarding_status")
@@ -325,7 +398,7 @@ model AuthIdentity {
   createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz
   updatedAt      DateTime     @updatedAt @map("updated_at") @db.Timestamptz
 
-  user User @relation(fields: [userId], references: [id])
+  user           User         @relation(fields: [userId], references: [id])
 
   @@unique([provider, providerUserId], map: "uq_auth_identities_provider_user_id")
   @@unique([userId, provider], map: "uq_auth_identities_user_provider")
@@ -336,7 +409,7 @@ model AuthIdentity {
 model UserSession {
   id                   String        @id @default(uuid(7)) @db.Uuid
   userId               String        @map("user_id") @db.Uuid
-  refreshTokenHash     String        @unique @map("refresh_token_hash")
+  refreshTokenHash     String        @map("refresh_token_hash")
   refreshTokenFamilyId String        @map("refresh_token_family_id") @db.Uuid
   sessionStatus        SessionStatus @default(ACTIVE) @map("session_status")
   userAgent            String?       @map("user_agent")
@@ -348,7 +421,7 @@ model UserSession {
   createdAt            DateTime      @default(now()) @map("created_at") @db.Timestamptz
   updatedAt            DateTime      @updatedAt @map("updated_at") @db.Timestamptz
 
-  user User @relation(fields: [userId], references: [id])
+  user                 User          @relation(fields: [userId], references: [id])
 
   @@index([userId, sessionStatus], map: "idx_user_sessions_user_status")
   @@index([refreshTokenFamilyId], map: "idx_user_sessions_refresh_family")
@@ -360,13 +433,13 @@ model SecurityToken {
   id           String            @id @default(uuid(7)) @db.Uuid
   userId       String            @map("user_id") @db.Uuid
   tokenType    SecurityTokenType @map("token_type")
-  tokenHash    String            @unique @map("token_hash")
+  tokenHash    String            @map("token_hash")
   expiresAt    DateTime          @map("expires_at") @db.Timestamptz
   usedAt       DateTime?         @map("used_at") @db.Timestamptz
   createdAt    DateTime          @default(now()) @map("created_at") @db.Timestamptz
   metadataJson Json?             @map("metadata_json") @db.JsonB
 
-  user User @relation(fields: [userId], references: [id])
+  user         User              @relation(fields: [userId], references: [id])
 
   @@index([userId, tokenType], map: "idx_security_tokens_user_type")
   @@index([expiresAt], map: "idx_security_tokens_expires_at")
@@ -391,7 +464,7 @@ model Profile {
   createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamptz
   updatedAt        DateTime         @updatedAt @map("updated_at") @db.Timestamptz
 
-  user User @relation(fields: [userId], references: [id])
+  user             User             @relation(fields: [userId], references: [id])
 
   @@index([userId], map: "idx_profiles_user_id")
   @@index([gender], map: "idx_profiles_gender")
@@ -418,7 +491,7 @@ model ProfilePhoto {
   updatedAt        DateTime         @updatedAt @map("updated_at") @db.Timestamptz
   deletedAt        DateTime?        @map("deleted_at") @db.Timestamptz
 
-  user User @relation(fields: [userId], references: [id])
+  user             User             @relation(fields: [userId], references: [id])
 
   @@index([userId, sortOrder], map: "idx_profile_photos_user_order")
   @@index([userId, moderationStatus], map: "idx_profile_photos_user_moderation")
@@ -427,36 +500,36 @@ model ProfilePhoto {
 }
 
 model UserLocation {
-  id     String @id @default(uuid(7)) @db.Uuid
-  userId String @unique @map("user_id") @db.Uuid
+  id                 String                 @id @default(uuid(7)) @db.Uuid
+  userId             String                 @unique @map("user_id") @db.Uuid
 
   // PostGIS fields. Use raw SQL for writes/queries and GIST indexes if Prisma version does not support geography.
-  realLocation     Unsupported("geography(Point,4326)")? @map("real_location")
-  passportLocation Unsupported("geography(Point,4326)")? @map("passport_location")
+  realLocation       Unsupported("geography(Point,4326)")?     @map("real_location")
+  passportLocation   Unsupported("geography(Point,4326)")?     @map("passport_location")
 
-  activeLocationMode ActiveLocationMode @default(REAL) @map("active_location_mode")
-  accuracyMeters     Int?               @map("accuracy_meters")
-  isMocked           Boolean            @default(false) @map("is_mocked")
-  updatedAt          DateTime           @updatedAt @map("updated_at") @db.Timestamptz
-  createdAt          DateTime           @default(now()) @map("created_at") @db.Timestamptz
+  activeLocationMode ActiveLocationMode     @default(REAL) @map("active_location_mode")
+  accuracyMeters     Int?                   @map("accuracy_meters")
+  isMocked           Boolean                @default(false) @map("is_mocked")
+  updatedAt          DateTime               @updatedAt @map("updated_at") @db.Timestamptz
+  createdAt          DateTime               @default(now()) @map("created_at") @db.Timestamptz
 
-  user User @relation(fields: [userId], references: [id])
+  user               User                   @relation(fields: [userId], references: [id])
 
   @@index([userId], map: "idx_user_locations_user_id")
   @@map("user_locations")
 }
 
 model DiscoveryPreference {
-  id               String   @id @default(uuid(7)) @db.Uuid
-  userId           String   @unique @map("user_id") @db.Uuid
-  minAge           Int      @map("min_age")
-  maxAge           Int      @map("max_age")
-  maxDistanceKm    Int      @map("max_distance_km")
-  preferredGenders Json     @map("preferred_genders") @db.JsonB
-  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz
+  id                String   @id @default(uuid(7)) @db.Uuid
+  userId            String   @unique @map("user_id") @db.Uuid
+  minAge            Int      @map("min_age")
+  maxAge            Int      @map("max_age")
+  maxDistanceKm     Int      @map("max_distance_km")
+  preferredGenders  Json     @map("preferred_genders") @db.JsonB
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt         DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
-  user User @relation(fields: [userId], references: [id])
+  user              User     @relation(fields: [userId], references: [id])
 
   @@index([userId], map: "idx_discovery_preferences_user_id")
   @@map("discovery_preferences")
@@ -472,7 +545,7 @@ model UserPrivacySettings {
   createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
-  user User @relation(fields: [userId], references: [id])
+  user             User     @relation(fields: [userId], references: [id])
 
   @@index([userId], map: "idx_user_privacy_settings_user_id")
   @@index([isHidden], map: "idx_user_privacy_settings_is_hidden")
@@ -480,23 +553,23 @@ model UserPrivacySettings {
 }
 
 model SwipeEvent {
-  id                String           @id @default(uuid(7)) @db.Uuid
-  swiperId          String           @map("swiper_id") @db.Uuid
-  targetUserId      String           @map("target_user_id") @db.Uuid
+  id                String             @id @default(uuid(7)) @db.Uuid
+  swiperId          String             @map("swiper_id") @db.Uuid
+  targetUserId      String             @map("target_user_id") @db.Uuid
   action            SwipeAction
-  message           String?          @db.VarChar(500)
-  status            SwipeEventStatus @default(ACTIVE)
-  createdAt         DateTime         @default(now()) @map("created_at") @db.Timestamptz
-  revertedAt        DateTime?        @map("reverted_at") @db.Timestamptz
-  revertedByEventId String?          @map("reverted_by_event_id") @db.Uuid
+  message           String?            @db.VarChar(500)
+  status            SwipeEventStatus   @default(ACTIVE)
+  createdAt         DateTime           @default(now()) @map("created_at") @db.Timestamptz
+  revertedAt        DateTime?          @map("reverted_at") @db.Timestamptz
+  revertedByEventId String?            @map("reverted_by_event_id") @db.Uuid
 
-  swiper          User         @relation("SwipeEventsCreated", fields: [swiperId], references: [id])
-  targetUser      User         @relation("SwipeEventsReceived", fields: [targetUserId], references: [id])
-  revertedByEvent SwipeEvent?  @relation("SwipeEventReversions", fields: [revertedByEventId], references: [id])
-  revertedEvents  SwipeEvent[] @relation("SwipeEventReversions")
+  swiper            User               @relation("SwipeEventsCreated", fields: [swiperId], references: [id])
+  targetUser        User               @relation("SwipeEventsReceived", fields: [targetUserId], references: [id])
+  revertedByEvent   SwipeEvent?        @relation("SwipeEventReversions", fields: [revertedByEventId], references: [id])
+  revertedEvents    SwipeEvent[]       @relation("SwipeEventReversions")
 
-  swipeStates    SwipeState[]
-  matchesCreated Match[]
+  swipeStates       SwipeState[]
+  matchesCreated    Match[]
 
   @@index([swiperId, targetUserId, createdAt], map: "idx_swipe_events_swiper_target_created")
   @@index([targetUserId, action, createdAt], map: "idx_swipe_events_target_action_created")
@@ -514,9 +587,9 @@ model SwipeState {
   createdAt        DateTime           @default(now()) @map("created_at") @db.Timestamptz
   updatedAt        DateTime           @updatedAt @map("updated_at") @db.Timestamptz
 
-  swiper         User       @relation("SwipeStatesCreated", fields: [swiperId], references: [id])
-  targetUser     User       @relation("SwipeStatesReceived", fields: [targetUserId], references: [id])
-  lastSwipeEvent SwipeEvent @relation(fields: [lastSwipeEventId], references: [id])
+  swiper           User               @relation("SwipeStatesCreated", fields: [swiperId], references: [id])
+  targetUser       User               @relation("SwipeStatesReceived", fields: [targetUserId], references: [id])
+  lastSwipeEvent   SwipeEvent         @relation(fields: [lastSwipeEventId], references: [id])
 
   @@id([swiperId, targetUserId])
   @@index([swiperId, currentAction], map: "idx_swipe_states_swiper_action")
@@ -526,32 +599,30 @@ model SwipeState {
 }
 
 model Match {
-  id                      String      @id @default(uuid(7)) @db.Uuid
-  userAId                 String      @map("user_a_id") @db.Uuid
-  userBId                 String      @map("user_b_id") @db.Uuid
-  status                  MatchStatus @default(ACTIVE)
-  matchedAt               DateTime?   @map("matched_at") @db.Timestamptz
-  unmatchedAt             DateTime?   @map("unmatched_at") @db.Timestamptz
-  unmatchedByUserId       String?     @map("unmatched_by_user_id") @db.Uuid
-  blockedByUserId         String?     @map("blocked_by_user_id") @db.Uuid
-  lastMessageAt           DateTime?   @map("last_message_at") @db.Timestamptz
-  lastInteractionAt       DateTime?   @map("last_interaction_at") @db.Timestamptz
-  unreadCountA            Int         @default(0) @map("unread_count_a")
-  unreadCountB            Int         @default(0) @map("unread_count_b")
-  lastReadMessageIdA      String?     @map("last_read_message_id_a") @db.Uuid
-  lastReadMessageIdB      String?     @map("last_read_message_id_b") @db.Uuid
-  lastReadAtA             DateTime?   @map("last_read_at_a") @db.Timestamptz
-  lastReadAtB             DateTime?   @map("last_read_at_b") @db.Timestamptz
-  createdFromSwipeEventId String?     @map("created_from_swipe_event_id") @db.Uuid
-  createdAt               DateTime    @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt               DateTime    @updatedAt @map("updated_at") @db.Timestamptz
+  id                      String       @id @default(uuid(7)) @db.Uuid
+  userAId                 String       @map("user_a_id") @db.Uuid
+  userBId                 String       @map("user_b_id") @db.Uuid
+  status                  MatchStatus  @default(ACTIVE)
+  matchedAt               DateTime?    @map("matched_at") @db.Timestamptz
+  unmatchedAt             DateTime?    @map("unmatched_at") @db.Timestamptz
+  unmatchedByUserId       String?      @map("unmatched_by_user_id") @db.Uuid
+  blockedByUserId         String?      @map("blocked_by_user_id") @db.Uuid
+  lastMessageAt           DateTime?    @map("last_message_at") @db.Timestamptz
+  lastInteractionAt       DateTime?    @map("last_interaction_at") @db.Timestamptz
+  unreadCountA            Int          @default(0) @map("unread_count_a")
+  unreadCountB            Int          @default(0) @map("unread_count_b")
+  lastReadMessageIdA      String?      @map("last_read_message_id_a") @db.Uuid
+  lastReadMessageIdB      String?      @map("last_read_message_id_b") @db.Uuid
+  lastReadAtA             DateTime?    @map("last_read_at_a") @db.Timestamptz
+  lastReadAtB             DateTime?    @map("last_read_at_b") @db.Timestamptz
+  createdFromSwipeEventId String?      @map("created_from_swipe_event_id") @db.Uuid
+  createdAt               DateTime     @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt               DateTime     @updatedAt @map("updated_at") @db.Timestamptz
 
-  userA                 User        @relation("MatchesAsA", fields: [userAId], references: [id])
-  userB                 User        @relation("MatchesAsB", fields: [userBId], references: [id])
-  unmatchedByUser       User?       @relation("MatchesUnmatchedBy", fields: [unmatchedByUserId], references: [id])
-  blockedByUser         User?       @relation("MatchesBlockedBy", fields: [blockedByUserId], references: [id])
-  createdFromSwipeEvent SwipeEvent? @relation(fields: [createdFromSwipeEventId], references: [id])
-  messages              Message[]
+  userA                   User         @relation("MatchesAsA", fields: [userAId], references: [id])
+  userB                   User         @relation("MatchesAsB", fields: [userBId], references: [id])
+  createdFromSwipeEvent   SwipeEvent?  @relation(fields: [createdFromSwipeEventId], references: [id])
+  messages                Message[]
 
   @@unique([userAId, userBId], map: "uq_matches_user_pair")
   @@index([userAId, status], map: "idx_matches_user_a_status")
@@ -572,8 +643,8 @@ model Message {
   createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz
   deletedAt   DateTime?     @map("deleted_at") @db.Timestamptz
 
-  match  Match @relation(fields: [matchId], references: [id])
-  sender User  @relation(fields: [senderId], references: [id])
+  match       Match         @relation(fields: [matchId], references: [id])
+  sender      User          @relation(fields: [senderId], references: [id])
 
   @@index([matchId, createdAt], map: "idx_messages_match_created")
   @@index([senderId, createdAt], map: "idx_messages_sender_created")
@@ -589,8 +660,8 @@ model UserBlock {
   createdAt     DateTime    @default(now()) @map("created_at") @db.Timestamptz
   revokedAt     DateTime?   @map("revoked_at") @db.Timestamptz
 
-  blocker     User @relation("BlocksCreated", fields: [blockerId], references: [id])
-  blockedUser User @relation("BlocksReceived", fields: [blockedUserId], references: [id])
+  blocker       User        @relation("BlocksCreated", fields: [blockerId], references: [id])
+  blockedUser   User        @relation("BlocksReceived", fields: [blockedUserId], references: [id])
 
   @@unique([blockerId, blockedUserId], map: "uq_user_blocks_pair")
   @@index([blockerId, status], map: "idx_user_blocks_blocker_status")
@@ -612,9 +683,9 @@ model UserReport {
   resolvedByAdminId String?          @map("resolved_by_admin_id") @db.Uuid
   resolutionNote    String?          @map("resolution_note")
 
-  reporter        User  @relation("ReportsCreated", fields: [reporterId], references: [id])
-  reportedUser    User  @relation("ReportsReceived", fields: [reportedUserId], references: [id])
-  resolvedByAdmin User? @relation("ReportsResolved", fields: [resolvedByAdminId], references: [id])
+  reporter          User             @relation("ReportsCreated", fields: [reporterId], references: [id])
+  reportedUser      User             @relation("ReportsReceived", fields: [reportedUserId], references: [id])
+  resolvedByAdmin   User?            @relation("ReportsResolved", fields: [resolvedByAdminId], references: [id])
 
   @@index([reportedUserId, status], map: "idx_user_reports_reported_status")
   @@index([reporterId, createdAt], map: "idx_user_reports_reporter_created")
@@ -641,8 +712,8 @@ model PaymentOrder {
   createdAt             DateTime        @default(now()) @map("created_at") @db.Timestamptz
   updatedAt             DateTime        @updatedAt @map("updated_at") @db.Timestamptz
 
-  user          User               @relation(fields: [userId], references: [id])
-  subscriptions UserSubscription[]
+  user                  User            @relation(fields: [userId], references: [id])
+  subscriptions         UserSubscription[]
 
   @@index([userId, createdAt], map: "idx_payment_orders_user_created")
   @@index([paymentStatus, createdAt], map: "idx_payment_orders_status_created")
@@ -663,9 +734,9 @@ model UserSubscription {
   createdAt          DateTime             @default(now()) @map("created_at") @db.Timestamptz
   updatedAt          DateTime             @updatedAt @map("updated_at") @db.Timestamptz
 
-  user         User              @relation(fields: [userId], references: [id])
-  paymentOrder PaymentOrder?     @relation(fields: [paymentOrderId], references: [id])
-  entitlements UserEntitlement[]
+  user               User                 @relation(fields: [userId], references: [id])
+  paymentOrder       PaymentOrder?        @relation(fields: [paymentOrderId], references: [id])
+  entitlements       UserEntitlement[]
 
   @@index([userId, status], map: "idx_user_subscriptions_user_status")
   @@index([currentPeriodEnd], map: "idx_user_subscriptions_period_end")
@@ -674,19 +745,19 @@ model UserSubscription {
 }
 
 model UserEntitlement {
-  id              String          @id @default(uuid(7)) @db.Uuid
-  userId          String          @map("user_id") @db.Uuid
-  subscriptionId  String?         @map("subscription_id") @db.Uuid
-  entitlementType EntitlementType @map("entitlement_type")
+  id              String            @id @default(uuid(7)) @db.Uuid
+  userId          String            @map("user_id") @db.Uuid
+  subscriptionId  String?           @map("subscription_id") @db.Uuid
+  entitlementType EntitlementType    @map("entitlement_type")
   quantity        Int?
-  windowStart     DateTime?       @map("window_start") @db.Timestamptz
-  windowEnd       DateTime?       @map("window_end") @db.Timestamptz
-  expiresAt       DateTime?       @map("expires_at") @db.Timestamptz
-  createdAt       DateTime        @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt       DateTime        @updatedAt @map("updated_at") @db.Timestamptz
+  windowStart     DateTime?         @map("window_start") @db.Timestamptz
+  windowEnd       DateTime?         @map("window_end") @db.Timestamptz
+  expiresAt       DateTime?         @map("expires_at") @db.Timestamptz
+  createdAt       DateTime          @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime          @updatedAt @map("updated_at") @db.Timestamptz
 
-  user         User              @relation(fields: [userId], references: [id])
-  subscription UserSubscription? @relation(fields: [subscriptionId], references: [id])
+  user            User              @relation(fields: [userId], references: [id])
+  subscription    UserSubscription? @relation(fields: [subscriptionId], references: [id])
 
   @@index([userId, entitlementType, expiresAt], map: "idx_user_entitlements_user_type_expiry")
   @@index([subscriptionId], map: "idx_user_entitlements_subscription")
@@ -706,7 +777,7 @@ model Notification {
   updatedAt      DateTime                   @updatedAt @map("updated_at") @db.Timestamptz
   expiresAt      DateTime                   @map("expires_at") @db.Timestamptz
 
-  user User @relation(fields: [userId], references: [id])
+  user           User                       @relation(fields: [userId], references: [id])
 
   @@index([userId, createdAt], map: "idx_notifications_user_created")
   @@index([userId, readAt], map: "idx_notifications_user_read")
@@ -725,7 +796,7 @@ model AuditLog {
   userAgent    String?  @map("user_agent")
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
 
-  actorUser User? @relation(fields: [actorUserId], references: [id])
+  actorUser    User?    @relation(fields: [actorUserId], references: [id])
 
   @@index([actorUserId, createdAt], map: "idx_audit_logs_actor_created")
   @@index([targetType, targetId], map: "idx_audit_logs_target")
@@ -752,3 +823,204 @@ model OutboxEvent {
   @@index([aggregateType, aggregateId], map: "idx_outbox_events_aggregate")
   @@map("outbox_events")
 }
+```
+
+---
+
+# 3. Required raw SQL migration additions
+
+Prisma schema alone is not enough for this database. The migration must include raw SQL for database-level constraints and PostGIS.
+
+## 3.1 PostGIS extension
+
+```sql
+CREATE EXTENSION IF NOT EXISTS postgis;
+```
+
+## 3.2 GIST indexes for location
+
+```sql
+CREATE INDEX IF NOT EXISTS idx_user_locations_real_gist
+ON user_locations
+USING GIST (real_location);
+
+CREATE INDEX IF NOT EXISTS idx_user_locations_passport_gist
+ON user_locations
+USING GIST (passport_location);
+```
+
+## 3.3 Partial unique indexes for profile photos
+
+```sql
+CREATE UNIQUE INDEX IF NOT EXISTS uq_profile_photos_user_sort_active
+ON profile_photos(user_id, sort_order)
+WHERE deleted_at IS NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_profile_photos_user_avatar_active
+ON profile_photos(user_id)
+WHERE is_avatar = true AND deleted_at IS NULL;
+```
+
+## 3.4 Check constraints Prisma cannot fully express
+
+```sql
+ALTER TABLE profiles
+ADD CONSTRAINT chk_profiles_height_cm
+CHECK (height_cm IS NULL OR (height_cm BETWEEN 100 AND 250));
+
+ALTER TABLE discovery_preferences
+ADD CONSTRAINT chk_discovery_preferences_age
+CHECK (min_age >= 18 AND max_age >= min_age);
+
+ALTER TABLE discovery_preferences
+ADD CONSTRAINT chk_discovery_preferences_distance
+CHECK (max_distance_km > 0);
+
+ALTER TABLE swipe_events
+ADD CONSTRAINT chk_swipe_events_not_self
+CHECK (swiper_id <> target_user_id);
+
+ALTER TABLE swipe_states
+ADD CONSTRAINT chk_swipe_states_not_self
+CHECK (swiper_id <> target_user_id);
+
+ALTER TABLE matches
+ADD CONSTRAINT chk_matches_not_self
+CHECK (user_a_id <> user_b_id);
+
+ALTER TABLE matches
+ADD CONSTRAINT chk_matches_unread_counts
+CHECK (unread_count_a >= 0 AND unread_count_b >= 0);
+
+ALTER TABLE messages
+ADD CONSTRAINT chk_messages_text_body
+CHECK (
+  (message_type = 'text' AND body IS NOT NULL)
+  OR message_type <> 'text'
+);
+
+ALTER TABLE messages
+ADD CONSTRAINT chk_messages_image_media_url
+CHECK (
+  (message_type = 'image' AND media_url IS NOT NULL)
+  OR message_type <> 'image'
+);
+
+ALTER TABLE user_blocks
+ADD CONSTRAINT chk_user_blocks_not_self
+CHECK (blocker_id <> blocked_user_id);
+
+ALTER TABLE user_reports
+ADD CONSTRAINT chk_user_reports_not_self
+CHECK (reporter_id <> reported_user_id);
+
+ALTER TABLE payment_orders
+ADD CONSTRAINT chk_payment_orders_amount
+CHECK (amount > 0);
+
+ALTER TABLE user_subscriptions
+ADD CONSTRAINT chk_user_subscriptions_period
+CHECK (current_period_end > current_period_start);
+
+ALTER TABLE user_entitlements
+ADD CONSTRAINT chk_user_entitlements_quantity
+CHECK (quantity IS NULL OR quantity >= 0);
+
+ALTER TABLE user_entitlements
+ADD CONSTRAINT chk_user_entitlements_window
+CHECK (
+  window_end IS NULL
+  OR (window_start IS NOT NULL AND window_end > window_start)
+);
+
+ALTER TABLE outbox_events
+ADD CONSTRAINT chk_outbox_events_attempts
+CHECK (attempts >= 0);
+```
+
+## 3.5 Match pair ordering
+
+The application must always sort user pair IDs before inserting match:
+
+```text
+user_a_id = smaller UUID string
+user_b_id = larger UUID string
+```
+
+Optional DB check can be added if desired:
+
+```sql
+ALTER TABLE matches
+ADD CONSTRAINT chk_matches_pair_order
+CHECK (user_a_id < user_b_id);
+```
+
+---
+
+# 4. Review notes before applying to real schema
+
+## 4.1 Prisma version check
+
+Before using this draft, check installed Prisma version.
+
+If Prisma < 5.18:
+
+```text
+Do not use @default(uuid(7)).
+Generate UUIDv7 in application service layer.
+```
+
+## 4.2 PostGIS strategy check
+
+Before migration, decide whether actual installed Prisma version supports native spatial type for your target usage.
+
+For safe phase 1:
+
+```text
+Use Unsupported("geography(Point,4326)")?
+Use raw SQL for location writes and discovery queries.
+```
+
+## 4.3 Circular FK note
+
+This draft intentionally does not create Prisma relations for:
+
+```text
+matches.last_read_message_id_a
+matches.last_read_message_id_b
+```
+
+Reason: avoiding circular relation complexity between `matches` and `messages` in phase 1.
+
+Service must validate these IDs when updating read state.
+
+## 4.4 Direct copy warning
+
+Do not paste this into `schema.prisma` blindly.
+
+The final implementation should be adapted to:
+
+- current Prisma version
+- existing project generator block
+- current datasource style
+- actual package.json scripts
+- migration strategy
+- RDS PostgreSQL version
+
+---
+
+# 5. Approval checklist
+
+Before moving this into the real codebase:
+
+- [ ] Prisma version supports `uuid(7)` or app-level UUIDv7 is chosen.
+- [ ] PostGIS migration strategy is chosen.
+- [ ] Raw SQL constraints are accepted.
+- [ ] `UserLocation` raw SQL access pattern is accepted.
+- [ ] `preferredGenders` as JSONB is accepted.
+- [ ] `interestsJson` as JSONB is accepted.
+- [ ] `lifestyleJson` as JSONB is accepted.
+- [ ] `messages` only supports text/image.
+- [ ] Notifications are in-app only.
+- [ ] Entitlements table is kept.
+- [ ] VNPAY payment flow is prepaid, not recurring.
