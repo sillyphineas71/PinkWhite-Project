@@ -1,10 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { randomUUID } from 'crypto';
+import { Prisma } from '@prisma/client';
+import { PrismaService } from '../../../database/prisma.service';
 
 export interface UserEntity {
   id: string;
   email: string;
   passwordHash: string | null;
+  accountStatus: string; // 'ACTIVE', 'PENDING_EMAIL_VERIFICATION', 'SUSPENDED', 'BANNED', 'DELETED'
   isEmailVerified: boolean;
   isOnboarded: boolean;
   isBanned: boolean;
@@ -18,99 +20,168 @@ export interface UserEntity {
 @Injectable()
 export class UserRepository {
   private readonly logger = new Logger(UserRepository.name);
-  private readonly users: Map<string, UserEntity> = new Map();
 
-  async create(data: {
-    email: string;
-    passwordHash: string | null;
-  }): Promise<UserEntity> {
-    const now = new Date();
-    const user: UserEntity = {
-      id: randomUUID(),
-      email: data.email,
-      passwordHash: data.passwordHash,
-      isEmailVerified: false,
-      isOnboarded: false,
-      isBanned: false,
-      isPremium: false,
-      isHidden: false,
-      deletedAt: null,
-      createdAt: now,
-      updatedAt: now,
+  constructor(private readonly prisma: PrismaService) {}
+
+  private client(tx?: Prisma.TransactionClient) {
+    return tx ?? this.prisma;
+  }
+
+  async create(
+    data: { email: string; passwordHash: string | null },
+    tx?: Prisma.TransactionClient,
+  ): Promise<UserEntity> {
+    const client = this.client(tx);
+
+    const execute = async (c: Prisma.TransactionClient) => {
+      const user = await c.user.create({
+        data: {
+          email: data.email,
+          emailNormalized: data.email.toLowerCase().trim(),
+        },
+      });
+
+      // Create auth_identity when passwordHash is provided
+      if (data.passwordHash) {
+        await c.authIdentity.create({
+          data: {
+            userId: user.id,
+            provider: 'EMAIL',
+            providerUserId: data.email.toLowerCase().trim(),
+            passwordHash: data.passwordHash,
+          },
+        });
+      }
+
+      return this.toEntity(user, data.passwordHash ?? null);
     };
-    this.users.set(user.id, user);
-    this.logger.debug(`[MOCK] User created: ${user.id}`);
-    return { ...user };
+
+    // If already in a transaction, reuse it; otherwise wrap in a new transaction
+    if (tx) {
+      return execute(client);
+    }
+    return this.prisma.$transaction(execute);
   }
 
   async findByEmail(email: string): Promise<UserEntity | null> {
-    for (const user of this.users.values()) {
-      if (user.email === email) {
-        return { ...user };
-      }
-    }
-    return null;
+    const emailNormalized = email.toLowerCase().trim();
+    const user = await this.prisma.user.findUnique({
+      where: { emailNormalized },
+      include: { authIdentities: { where: { provider: 'EMAIL' } } },
+    });
+    return user ? this.toEntityFull(user) : null;
   }
 
   async findById(id: string): Promise<UserEntity | null> {
-    const user = this.users.get(id);
-    return user ? { ...user } : null;
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+      include: { authIdentities: { where: { provider: 'EMAIL' } } },
+    });
+    return user ? this.toEntityFull(user) : null;
   }
 
-  async updatePasswordHash(
-    id: string,
-    passwordHash: string | null,
-  ): Promise<void> {
-    const user = this.users.get(id);
-    if (user) {
-      user.passwordHash = passwordHash;
-      user.updatedAt = new Date();
+  async updatePasswordHash(id: string, passwordHash: string | null, tx?: Prisma.TransactionClient): Promise<void> {
+    const client = this.client(tx);
+    const identity = await client.authIdentity.findFirst({
+      where: { userId: id, provider: 'EMAIL' },
+    });
+    if (identity) {
+      await client.authIdentity.update({
+        where: { id: identity.id },
+        data: { passwordHash },
+      });
     }
   }
 
-  async setEmailVerified(email: string): Promise<void> {
-    for (const user of this.users.values()) {
-      if (user.email === email) {
-        user.isEmailVerified = true;
-        user.updatedAt = new Date();
-        return;
-      }
-    }
+  async setEmailVerified(email: string, tx?: Prisma.TransactionClient): Promise<void> {
+    const client = this.client(tx);
+    const emailNormalized = email.toLowerCase().trim();
+    await client.user.update({
+      where: { emailNormalized },
+      data: { emailVerifiedAt: new Date() },
+    });
   }
 
-  async softDelete(id: string): Promise<void> {
-    const user = this.users.get(id);
-    if (user) {
-      user.deletedAt = new Date();
-      user.updatedAt = new Date();
-    }
+  async softDelete(id: string, tx?: Prisma.TransactionClient): Promise<void> {
+    const client = this.client(tx);
+    await client.user.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+    });
   }
 
-  async restore(id: string): Promise<void> {
-    const user = this.users.get(id);
-    if (user) {
-      user.deletedAt = null;
-      user.updatedAt = new Date();
-    }
+  async restore(id: string, tx?: Prisma.TransactionClient): Promise<void> {
+    const client = this.client(tx);
+    await client.user.update({
+      where: { id },
+      data: { deletedAt: null },
+    });
   }
 
-  async setIsOnboarded(id: string, value: boolean): Promise<void> {
-    const user = this.users.get(id);
-    if (user) {
-      user.isOnboarded = value;
-      user.updatedAt = new Date();
-    }
+  async setIsOnboarded(id: string, value: boolean, tx?: Prisma.TransactionClient): Promise<void> {
+    const client = this.client(tx);
+    await client.user.update({
+      where: { id },
+      data: {
+        onboardingStatus: value ? 'COMPLETED' : 'IN_PROGRESS',
+        onboardingCompletedAt: value ? new Date() : null,
+      },
+    });
   }
 
-  async setIsHidden(id: string, value: boolean): Promise<void> {
-    const user = this.users.get(id);
-    if (user) {
-      user.isHidden = value;
-      user.updatedAt = new Date();
+  async setIsHidden(id: string, value: boolean, tx?: Prisma.TransactionClient): Promise<void> {
+    const client = this.client(tx);
+    // Hidden mode is stored in user_privacy_settings; upsert for compatibility
+    const settings = await client.userPrivacySettings.findUnique({ where: { userId: id } });
+    if (settings) {
+      await client.userPrivacySettings.update({
+        where: { userId: id },
+        data: { isHidden: value },
+      });
     }
   }
 
   async findAll(): Promise<UserEntity[]> {
-    return Array.from(this.users.values()).map(u => ({ ...u }));
+    const users = await this.prisma.user.findMany({
+      include: { authIdentities: { where: { provider: 'EMAIL' } } },
+    });
+    return users.map((u: any) => this.toEntityFull(u));
+  }
+
+  // ---- Mapping helpers ----
+
+  private toEntity(user: { id: string; email: string; emailVerifiedAt: Date | null; accountStatus: string; onboardingStatus: string; deletedAt: Date | null; createdAt: Date; updatedAt: Date }, passwordHash: string | null): UserEntity {
+    return {
+      id: user.id,
+      email: user.email,
+      passwordHash,
+      accountStatus: user.accountStatus,
+      isEmailVerified: user.emailVerifiedAt !== null,
+      isOnboarded: user.onboardingStatus === 'COMPLETED',
+      isBanned: user.accountStatus === 'BANNED',
+      isPremium: false,
+      isHidden: false,
+      deletedAt: user.deletedAt,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+    };
+  }
+
+  private toEntityFull(user: { id: string; email: string; emailVerifiedAt: Date | null; accountStatus: string; onboardingStatus: string; deletedAt: Date | null; createdAt: Date; updatedAt: Date; authIdentities: Array<{ passwordHash: string | null }> }): UserEntity {
+    const emailIdentity = user.authIdentities?.[0];
+    return {
+      id: user.id,
+      email: user.email,
+      passwordHash: emailIdentity?.passwordHash ?? null,
+      accountStatus: user.accountStatus,
+      isEmailVerified: user.emailVerifiedAt !== null,
+      isOnboarded: user.onboardingStatus === 'COMPLETED',
+      isBanned: user.accountStatus === 'BANNED',
+      isPremium: false,
+      isHidden: false,
+      deletedAt: user.deletedAt,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+    };
   }
 }

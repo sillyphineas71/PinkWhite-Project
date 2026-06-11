@@ -27,7 +27,7 @@ export class ResetPasswordTokenRepository {
       createdAt: new Date(),
     };
     this.tokens.set(token.id, token);
-    this.logger.debug(`[MOCK] ResetPasswordToken created for: ${data.email}`);
+    this.logger.debug('[MOCK] ResetPasswordToken created for: ' + data.email);
     return { ...token };
   }
 

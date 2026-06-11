@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { randomUUID } from 'crypto';
+import { Prisma } from '@prisma/client';
+import { PrismaService } from '../../../database/prisma.service';
 
 export interface SessionEntity {
   id: string;
@@ -14,72 +15,191 @@ export interface SessionEntity {
 @Injectable()
 export class SessionRepository {
   private readonly logger = new Logger(SessionRepository.name);
-  private readonly sessions: Map<string, SessionEntity> = new Map();
 
-  async create(data: {
-    userId: string;
-    refreshTokenHash: string;
-    userAgent?: string;
-    ipAddress?: string;
-    expiresAt: Date;
-  }): Promise<SessionEntity> {
-    const session: SessionEntity = {
-      id: randomUUID(),
-      userId: data.userId,
-      refreshTokenHash: data.refreshTokenHash,
-      userAgent: data.userAgent ?? null,
-      ipAddress: data.ipAddress ?? null,
-      expiresAt: data.expiresAt,
-      createdAt: new Date(),
-    };
-    this.sessions.set(session.id, session);
-    this.logger.debug(`[MOCK] Session created: ${session.id}`);
-    return { ...session };
+  constructor(private readonly prisma: PrismaService) {}
+
+  private client(tx?: Prisma.TransactionClient) {
+    return tx ?? this.prisma;
+  }
+
+  async create(
+    data: {
+      userId: string;
+      refreshTokenHash: string;
+      userAgent?: string;
+      ipAddress?: string;
+      expiresAt: Date;
+    },
+    tx?: Prisma.TransactionClient,
+  ): Promise<SessionEntity> {
+    const client = this.client(tx);
+    const session = await client.userSession.create({
+      data: {
+        userId: data.userId,
+        refreshTokenHash: data.refreshTokenHash,
+        refreshTokenFamilyId: crypto.randomUUID(),
+        sessionStatus: 'ACTIVE',
+        userAgent: data.userAgent ?? null,
+        ipHash: data.ipAddress ?? null,
+        expiresAt: data.expiresAt,
+      },
+    });
+    this.logger.debug(`Session created: ${session.id}`);
+    return this.toEntity(session);
   }
 
   async findByTokenHash(tokenHash: string): Promise<SessionEntity | null> {
-    for (const session of this.sessions.values()) {
-      if (session.refreshTokenHash === tokenHash) {
-        return { ...session };
-      }
-    }
-    return null;
+    const session = await this.prisma.userSession.findUnique({
+      where: { refreshTokenHash: tokenHash },
+    });
+    return session ? this.toEntity(session) : null;
   }
 
-  async deleteById(id: string): Promise<void> {
-    this.sessions.delete(id);
+  async findById(id: string): Promise<SessionEntity | null> {
+    const session = await this.prisma.userSession.findUnique({
+      where: { id },
+    });
+    return session ? this.toEntity(session) : null;
   }
 
-  async deleteAllByUserId(userId: string): Promise<number> {
-    let count = 0;
-    for (const [id, session] of this.sessions.entries()) {
-      if (session.userId === userId) {
-        this.sessions.delete(id);
-        count++;
-      }
-    }
-    this.logger.debug(`[MOCK] Deleted ${count} sessions for user: ${userId}`);
-    return count;
+  async findActiveById(id: string): Promise<SessionEntity | null> {
+    const session = await this.prisma.userSession.findFirst({
+      where: { id, sessionStatus: 'ACTIVE' },
+    });
+    return session ? this.toEntity(session) : null;
   }
 
+  async deleteById(id: string, tx?: Prisma.TransactionClient): Promise<void> {
+    const client = this.client(tx);
+    await client.userSession.update({
+      where: { id },
+      data: {
+        sessionStatus: 'REVOKED',
+        revokedAt: new Date(),
+        revokedReason: 'legacy_delete_by_id',
+      },
+    });
+  }
+
+  async deleteAllByUserId(userId: string, tx?: Prisma.TransactionClient): Promise<number> {
+    const client = this.client(tx);
+    const result = await client.userSession.updateMany({
+      where: { userId, sessionStatus: 'ACTIVE' },
+      data: {
+        sessionStatus: 'REVOKED',
+        revokedAt: new Date(),
+        revokedReason: 'legacy_delete_all_by_user_id',
+      },
+    });
+    this.logger.debug(`Revoked ${result.count} sessions for user: ${userId}`);
+    return result.count;
+  }
   async updateTokenHash(
     id: string,
     newTokenHash: string,
     newExpiresAt: Date,
+    tx?: Prisma.TransactionClient,
   ): Promise<void> {
-    const session = this.sessions.get(id);
-    if (session) {
-      session.refreshTokenHash = newTokenHash;
-      session.expiresAt = newExpiresAt;
-    }
+    const client = this.client(tx);
+    await client.userSession.update({
+      where: { id },
+      data: {
+        refreshTokenHash: newTokenHash,
+        expiresAt: newExpiresAt,
+        lastUsedAt: new Date(),
+      },
+    });
   }
 
-  /**
-   * Check if an old (rotated) token hash was reused — UC014 Reuse Detection
-   */
+  async rotateRefreshTokenHash(
+    params: {
+      sessionId: string;
+      userId: string;
+      oldRefreshTokenHash: string;
+      newRefreshTokenHash: string;
+      now?: Date;
+      tx?: Prisma.TransactionClient;
+    }
+  ): Promise<boolean> {
+    const client = this.client(params.tx);
+    const now = params.now ?? new Date();
+
+    const result = await client.userSession.updateMany({
+      where: {
+        id: params.sessionId,
+        userId: params.userId,
+        refreshTokenHash: params.oldRefreshTokenHash,
+        sessionStatus: 'ACTIVE',
+        expiresAt: {
+          gt: now,
+        },
+      },
+      data: {
+        refreshTokenHash: params.newRefreshTokenHash,
+        lastUsedAt: now,
+      },
+    });
+
+    return result.count === 1;
+  }
+
+  async revokeById(id: string, reason: string, tx?: Prisma.TransactionClient): Promise<void> {
+    const client = this.client(tx);
+    await client.userSession.update({
+      where: { id },
+      data: {
+        sessionStatus: 'REVOKED',
+        revokedAt: new Date(),
+        revokedReason: reason,
+      },
+    });
+  }
+
+  async revokeAllByUserId(userId: string, reason: string, tx?: Prisma.TransactionClient): Promise<number> {
+    const client = this.client(tx);
+    const result = await client.userSession.updateMany({
+      where: { userId, sessionStatus: 'ACTIVE' },
+      data: {
+        sessionStatus: 'REVOKED',
+        revokedAt: new Date(),
+        revokedReason: reason,
+      },
+    });
+    return result.count;
+  }
+
+  async markCompromised(id: string, tx?: Prisma.TransactionClient): Promise<void> {
+    const client = this.client(tx);
+    await client.userSession.update({
+      where: { id },
+      data: { sessionStatus: 'COMPROMISED' },
+    });
+  }
+
   async wasTokenHashEverUsed(tokenHash: string): Promise<boolean> {
-    // In mock mode, rotated tokens are deleted, so if not found it was either
-    // never valid or was rotated away. Real DB would keep an audit log.
-    return false;
+    const session = await this.prisma.userSession.findUnique({
+      where: { refreshTokenHash: tokenHash },
+    });
+    return session !== null;
+  }
+
+  private toEntity(session: {
+    id: string;
+    userId: string;
+    refreshTokenHash: string;
+    userAgent: string | null;
+    ipHash: string | null;
+    expiresAt: Date;
+    createdAt: Date;
+  }): SessionEntity {
+    return {
+      id: session.id,
+      userId: session.userId,
+      refreshTokenHash: session.refreshTokenHash,
+      userAgent: session.userAgent,
+      ipAddress: session.ipHash,
+      expiresAt: session.expiresAt,
+      createdAt: session.createdAt,
+    };
   }
 }

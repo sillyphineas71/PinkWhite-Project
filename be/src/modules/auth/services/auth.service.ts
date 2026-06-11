@@ -10,6 +10,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Response, Request } from 'express';
+import * as crypto from 'crypto';
 import { UserRepository } from '../repositories/user.repository';
 import { SessionRepository } from '../repositories/session.repository';
 import { VerificationTokenRepository } from '../repositories/verification-token.repository';
@@ -109,46 +110,22 @@ export class AuthService {
       throw new UnauthorizedException('Email hoặc mật khẩu không chính xác');
     }
 
-    if (!user.isEmailVerified) {
-      throw new ForbiddenException(
-        'Vui lòng xác thực email trước khi đăng nhập',
-      );
+    // Check account status: block SUSPENDED, BANNED, DELETED with generic failure
+    // Allow only ACTIVE and PENDING_EMAIL_VERIFICATION
+    if (
+      user.accountStatus === 'SUSPENDED' ||
+      user.accountStatus === 'BANNED' ||
+      user.accountStatus === 'DELETED'
+    ) {
+      throw new UnauthorizedException('Email hoặc mật khẩu không chính xác');
     }
 
-    if (user.isBanned) {
-      throw new ForbiddenException('Tài khoản của bạn đã bị khóa');
-    }
-
-    // Q6: Soft deleted user — allow login with pendingRestore
+    // Soft deleted user with deletedAt — also block with generic failure
     if (user.deletedAt) {
-      const daysSinceDelete =
-        (Date.now() - user.deletedAt.getTime()) / (1000 * 60 * 60 * 24);
-      if (daysSinceDelete > 30) {
-        throw new GoneException('Tài khoản đã bị xóa vĩnh viễn');
-      }
-
-      // Issue tokens but flag as pendingRestore
-      const tokens = await this.issueTokens(user.id, user.email, res, req);
-      this.logger.log(
-        JSON.stringify({
-          action: 'LOGIN_SUCCESS',
-          userId: user.id,
-          pendingRestore: true,
-          ip: req.ip,
-          timestamp: new Date().toISOString(),
-        }),
-      );
-      return {
-        message: 'Đăng nhập thành công',
-        user: {
-          id: user.id,
-          email: user.email,
-          isOnboarded: user.isOnboarded,
-        },
-        pendingRestore: true,
-      };
+      throw new UnauthorizedException('Email hoặc mật khẩu không chính xác');
     }
 
+    // ACTIVE or PENDING_EMAIL_VERIFICATION — allow login
     await this.issueTokens(user.id, user.email, res, req);
 
     this.logger.log(
@@ -171,19 +148,24 @@ export class AuthService {
   }
 
   // ===== UC003: Logout =====
-  async logout(userId: string, res: Response, refreshTokenCookie?: string) {
-    if (refreshTokenCookie) {
-      const tokenHash = hashToken(refreshTokenCookie);
-      const session = await this.sessionRepo.findByTokenHash(tokenHash);
-      if (session) {
-        await this.sessionRepo.deleteById(session.id);
-      }
+  async logout(userId: string, sessionId: string | undefined, res: Response) {
+    if (!sessionId) {
+      throw new UnauthorizedException('Không tìm thấy phiên đăng nhập');
     }
+
+    const session = await this.sessionRepo.findById(sessionId);
+    if (!session || session.userId !== userId) {
+      throw new UnauthorizedException('Phiên đăng nhập không hợp lệ');
+    }
+
+    await this.sessionRepo.revokeById(sessionId, 'logout');
+
     this.tokenService.clearAuthCookies(res);
     this.logger.log(
       JSON.stringify({
         action: 'LOGOUT',
         userId,
+        sessionId,
         timestamp: new Date().toISOString(),
       }),
     );
@@ -559,75 +541,66 @@ export class AuthService {
     req: Request,
   ) {
     if (!refreshTokenCookie) {
-      throw new UnauthorizedException();
+      throw new UnauthorizedException('Invalid refresh token');
     }
 
-    const tokenHash = hashToken(refreshTokenCookie);
-    const session = await this.sessionRepo.findByTokenHash(tokenHash);
-
-    if (!session) {
-      // Nếu token không có trong DB nhưng lại hợp lệ về mặt cấu trúc JWT (chưa hết hạn)
-      // => Dấu hiệu của việc token cũ bị đánh cắp và sử dụng lại!
-      let stolenUserId: string | null = null;
-      try {
-        const decoded =
-          this.tokenService.verifyRefreshToken(refreshTokenCookie);
-        stolenUserId = decoded.sub;
-      } catch {
-        // JWT không hợp lệ hoặc đã hết hạn, không cần thu hồi
-      }
-
-      if (stolenUserId) {
-        await this.sessionRepo.deleteAllByUserId(stolenUserId);
-        this.logger.error(
-          JSON.stringify({
-            action: 'REFRESH_TOKEN_REUSE_DETECTED',
-            level: 'CRITICAL',
-            userId: stolenUserId,
-            ip: req.ip,
-            message:
-              'Thu hồi TOÀN BỘ session do phát hiện tái sử dụng Refresh Token!',
-            timestamp: new Date().toISOString(),
-          }),
-        );
-      }
-
-      throw new UnauthorizedException();
+    let payload: any;
+    try {
+      payload = this.tokenService.verifyRefreshToken(refreshTokenCookie);
+    } catch {
+      throw new UnauthorizedException('Invalid refresh token');
     }
 
-    if (session.expiresAt < new Date()) {
-      await this.sessionRepo.deleteById(session.id);
-      throw new UnauthorizedException();
+    if (
+      !payload ||
+      payload.token_type !== 'refresh' ||
+      !payload.sub ||
+      !payload.session_id ||
+      !payload.jti
+    ) {
+      throw new UnauthorizedException('Invalid refresh token');
     }
 
-    const user = await this.userRepo.findById(session.userId);
-    if (!user) {
-      await this.sessionRepo.deleteById(session.id);
-      throw new UnauthorizedException();
-    }
-    if (user.isBanned) {
-      await this.sessionRepo.deleteAllByUserId(user.id);
-      throw new ForbiddenException('Tài khoản của bạn đã bị khóa');
-    }
+    const oldHash = hashToken(refreshTokenCookie);
+    const newJti = crypto.randomUUID();
 
-    // Rotate: new tokens, update session
-    const payload = { sub: user.id, email: user.email };
-    const newAccessToken = this.tokenService.signAccessToken(payload);
-    const newRefreshToken = this.tokenService.signRefreshToken(payload);
-    const newTokenHash = hashToken(newRefreshToken);
+    const newAccessTokenPayload = {
+      sub: payload.sub,
+      email: payload.email,
+      session_id: payload.session_id,
+      token_type: 'access' as const,
+    };
 
-    await this.sessionRepo.updateTokenHash(
-      session.id,
-      newTokenHash,
-      this.tokenService.getRefreshTokenExpiry(),
-    );
+    const newRefreshTokenPayload = {
+      sub: payload.sub,
+      email: payload.email,
+      session_id: payload.session_id,
+      jti: newJti,
+      token_type: 'refresh' as const,
+    };
+
+    const newAccessToken = this.tokenService.signAccessToken(newAccessTokenPayload);
+    const newRefreshToken = this.tokenService.signRefreshToken(newRefreshTokenPayload);
+    const newHash = hashToken(newRefreshToken);
+
+    const success = await this.sessionRepo.rotateRefreshTokenHash({
+      sessionId: payload.session_id,
+      userId: payload.sub,
+      oldRefreshTokenHash: oldHash,
+      newRefreshTokenHash: newHash,
+    });
+
+    if (!success) {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
 
     this.tokenService.setAuthCookies(res, newAccessToken, newRefreshToken);
 
     this.logger.log(
       JSON.stringify({
         action: 'TOKEN_REFRESHED',
-        userId: user.id,
+        userId: payload.sub,
+        sessionId: payload.session_id,
         timestamp: new Date().toISOString(),
       }),
     );
@@ -637,7 +610,7 @@ export class AuthService {
 
   // ===== UC015: Force Logout All =====
   async forceLogoutAll(userId: string, res: Response) {
-    const sessionCount = await this.sessionRepo.deleteAllByUserId(userId);
+    const sessionCount = await this.sessionRepo.revokeAllByUserId(userId, 'logout_all');
     this.tokenService.clearAuthCookies(res);
 
     this.logger.log(
@@ -659,19 +632,48 @@ export class AuthService {
     res: Response,
     req: Request,
   ) {
-    const payload = { sub: userId, email };
-    const accessToken = this.tokenService.signAccessToken(payload);
-    const refreshToken = this.tokenService.signRefreshToken(payload);
-    const refreshTokenHash = hashToken(refreshToken);
-
-    await this.sessionRepo.create({
+    // Step 1: Create session with temporary placeholder hash
+    const placeholderHash = hashToken(crypto.randomUUID());
+    const session = await this.sessionRepo.create({
       userId,
-      refreshTokenHash,
+      refreshTokenHash: placeholderHash,
       userAgent: req.headers['user-agent'],
       ipAddress: req.ip,
       expiresAt: this.tokenService.getRefreshTokenExpiry(),
     });
 
+    // Step 2: Generate jti for refresh token
+    const jti = crypto.randomUUID();
+
+    // Step 3: Create tokens with session_id and jti
+    const accessTokenPayload = {
+      sub: userId,
+      email,
+      session_id: session.id,
+      token_type: 'access' as const,
+    };
+    const refreshTokenPayload = {
+      sub: userId,
+      email,
+      session_id: session.id,
+      jti,
+      token_type: 'refresh' as const,
+    };
+
+    const accessToken = this.tokenService.signAccessToken(accessTokenPayload);
+    const refreshToken = this.tokenService.signRefreshToken(refreshTokenPayload);
+
+    // Step 4: Hash the actual refresh token
+    const refreshTokenHash = hashToken(refreshToken);
+
+    // Step 5: Update session with real hash
+    await this.sessionRepo.updateTokenHash(
+      session.id,
+      refreshTokenHash,
+      this.tokenService.getRefreshTokenExpiry(),
+    );
+
+    // Step 6: Set cookies
     this.tokenService.setAuthCookies(res, accessToken, refreshToken);
   }
 

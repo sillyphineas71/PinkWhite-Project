@@ -17,18 +17,17 @@ export class PrismaService
     try {
       await this.$connect();
       this.logger.log('Database connected');
-    } catch {
-      this.logger.warn(
-        'Database connection failed. App will continue with mock data.',
-      );
+    } catch (error) {
+      this.logger.error('Database connection failed during bootstrap', error);
+      throw error;
     }
   }
 
   async onModuleDestroy() {
     try {
       await this.$disconnect();
-    } catch {
-      // Silently ignore disconnect errors
+    } catch (error) {
+      this.logger.error('Database disconnect error', error);
     }
   }
 }

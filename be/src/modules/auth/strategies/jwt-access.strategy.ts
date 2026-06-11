@@ -6,7 +6,7 @@ import { Request } from 'express';
 import { JwtPayload } from '../services/token.service';
 
 /**
- * Extract JWT từ cookie "access_token" — ADR-004
+ * Extract JWT from cookie "access_token" — ADR-004
  */
 @Injectable()
 export class JwtAccessStrategy extends PassportStrategy(
@@ -24,6 +24,11 @@ export class JwtAccessStrategy extends PassportStrategy(
   }
 
   validate(payload: JwtPayload) {
-    return { userId: payload.sub, email: payload.email };
+    return {
+      userId: payload.sub,
+      email: payload.email,
+      sessionId: payload.session_id,
+      tokenType: payload.token_type,
+    };
   }
 }

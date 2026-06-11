@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { DatabaseModule } from '../../database/database.module';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { AuthController } from './controllers/auth.controller';
@@ -9,10 +10,13 @@ import { UserRepository } from './repositories/user.repository';
 import { SessionRepository } from './repositories/session.repository';
 import { VerificationTokenRepository } from './repositories/verification-token.repository';
 import { ResetPasswordTokenRepository } from './repositories/reset-password-token.repository';
+import { AuthIdentityRepository } from './repositories/auth-identity.repository';
+import { SecurityTokenRepository } from './repositories/security-token.repository';
 import { JwtAccessStrategy } from './strategies/jwt-access.strategy';
 
 @Module({
   imports: [
+    DatabaseModule,
     PassportModule.register({ defaultStrategy: 'jwt-access' }),
     JwtModule.register({}),
   ],
@@ -22,11 +26,13 @@ import { JwtAccessStrategy } from './strategies/jwt-access.strategy';
     AuthService,
     TokenService,
     EmailService,
-    // Repositories (in-memory mock — swap to Prisma later)
+    // Repositories (Prisma-backed where migrated; legacy token repos kept for later batches)
     UserRepository,
     SessionRepository,
     VerificationTokenRepository,
     ResetPasswordTokenRepository,
+    AuthIdentityRepository,
+    SecurityTokenRepository,
     // Passport strategies
     JwtAccessStrategy,
   ],

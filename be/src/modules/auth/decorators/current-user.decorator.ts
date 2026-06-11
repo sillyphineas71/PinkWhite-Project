@@ -2,7 +2,9 @@ import { createParamDecorator, ExecutionContext } from '@nestjs/common';
 
 export class AuthUser {
   userId!: string;
-  email!: string;
+  email?: string;
+  sessionId?: string;
+  tokenType?: 'access' | 'refresh';
 }
 
 /**

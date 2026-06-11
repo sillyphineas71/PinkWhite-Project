@@ -59,12 +59,11 @@ export class AuthController {
   async logout(
     @CurrentUser() user: AuthUser,
     @Res({ passthrough: true }) res: express.Response,
-    @Req() req: express.Request,
   ) {
     return this.authService.logout(
       user.userId,
+      user.sessionId,
       res,
-      (req as any).cookies?.refresh_token,
     );
   }
 

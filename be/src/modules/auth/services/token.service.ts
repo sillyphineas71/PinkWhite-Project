@@ -3,9 +3,27 @@ import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { Response } from 'express';
 
+export type TokenType = 'access' | 'refresh';
+
 export interface JwtPayload {
-  sub: string; // userId
-  email: string;
+  sub: string;
+  email?: string;
+  session_id?: string;
+  token_type?: TokenType;
+  jti?: string;
+}
+
+export interface AccessTokenPayload {
+  sub: string;
+  session_id: string;
+  token_type: 'access';
+}
+
+export interface RefreshTokenPayload {
+  sub: string;
+  session_id: string;
+  jti: string;
+  token_type: 'refresh';
 }
 
 @Injectable()
