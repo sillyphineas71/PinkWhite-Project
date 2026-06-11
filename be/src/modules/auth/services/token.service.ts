@@ -11,12 +11,14 @@ export interface JwtPayload {
   session_id?: string;
   token_type?: TokenType;
   jti?: string;
+  auth_context?: 'normal' | 'pending_restore';
 }
 
 export interface AccessTokenPayload {
   sub: string;
   session_id: string;
   token_type: 'access';
+  auth_context: 'normal' | 'pending_restore';
 }
 
 export interface RefreshTokenPayload {
@@ -24,6 +26,7 @@ export interface RefreshTokenPayload {
   session_id: string;
   jti: string;
   token_type: 'refresh';
+  auth_context: 'normal' | 'pending_restore';
 }
 
 @Injectable()

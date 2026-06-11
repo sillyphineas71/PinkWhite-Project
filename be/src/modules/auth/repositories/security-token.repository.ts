@@ -69,15 +69,17 @@ export class SecurityTokenRepository {
 
   async deleteAllByUserId(userId: string, tx?: Prisma.TransactionClient): Promise<void> {
     const client = this.client(tx);
-    await client.securityToken.deleteMany({
-      where: { userId },
+    await client.securityToken.updateMany({
+      where: { userId, usedAt: null },
+      data: { usedAt: new Date() },
     });
   }
 
   async invalidateByUserIdAndType(userId: string, tokenType: string, tx?: Prisma.TransactionClient): Promise<number> {
     const client = this.client(tx);
-    const result = await client.securityToken.deleteMany({
-      where: { userId, tokenType: tokenType as any },
+    const result = await client.securityToken.updateMany({
+      where: { userId, tokenType: tokenType as any, usedAt: null },
+      data: { usedAt: new Date() },
     });
     return result.count;
   }

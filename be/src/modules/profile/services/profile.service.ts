@@ -16,18 +16,24 @@ import {
 } from '../dto/profile.dto';
 
 import { UserRepository } from '../../auth/repositories/user.repository';
+import { PrismaService } from '../../../database/prisma.service';
 
 @Injectable()
 export class ProfileService {
   constructor(
     private readonly profileRepo: ProfileRepository,
     private readonly userRepo: UserRepository,
+    private readonly prisma: PrismaService,
   ) {}
 
   private calculateAge(dob: Date): number {
-    const diff_ms = Date.now() - dob.getTime();
-    const age_dt = new Date(diff_ms);
-    return Math.abs(age_dt.getUTCFullYear() - 1970);
+    const today = new Date();
+    let age = today.getFullYear() - dob.getFullYear();
+    const m = today.getMonth() - dob.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) {
+      age--;
+    }
+    return age;
   }
 
   private hasProfanityOrUrl(text: string): boolean {
@@ -69,7 +75,7 @@ export class ProfileService {
       searchGender: dto.searchGender,
     });
 
-    await this.userRepo.setIsOnboarded(userId, true);
+    await this.evaluateOnboarding(userId);
 
     return profile;
   }
@@ -145,10 +151,15 @@ export class ProfileService {
       dataToUpdate.genderUpdatedAt = now;
     }
 
-    return this.profileRepo.update(
+    const updated = await this.profileRepo.update(
       userId,
       dataToUpdate,
-    ) as Promise<ProfileEntity>;
+    );
+    if (!updated) {
+      throw new BadRequestException('Profile not found');
+    }
+    await this.evaluateOnboarding(userId);
+    return updated;
   }
 
   async updateBioInterests(
@@ -165,10 +176,15 @@ export class ProfileService {
     if (dto.bio !== undefined) dataToUpdate.bio = dto.bio;
     if (dto.interestIds !== undefined) dataToUpdate.interests = dto.interestIds; // MOCK ONLY - normally M:M relational insert
 
-    return this.profileRepo.update(
+    const updated = await this.profileRepo.update(
       userId,
       dataToUpdate,
-    ) as Promise<ProfileEntity>;
+    );
+    if (!updated) {
+      throw new BadRequestException('Profile not found');
+    }
+    await this.evaluateOnboarding(userId);
+    return updated;
   }
 
   async updateEducationJob(
@@ -187,9 +203,87 @@ export class ProfileService {
     if (dto.jobTitle !== undefined) dataToUpdate.jobTitle = dto.jobTitle.trim();
     if (dto.school !== undefined) dataToUpdate.school = dto.school.trim();
 
-    return this.profileRepo.update(
+    const updated = await this.profileRepo.update(
       userId,
       dataToUpdate,
-    ) as Promise<ProfileEntity>;
+    );
+    if (!updated) {
+      throw new BadRequestException('Profile not found');
+    }
+    await this.evaluateOnboarding(userId);
+    return updated;
+  }
+
+  async evaluateOnboarding(userId: string): Promise<void> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        profile: true,
+        location: true,
+        discoveryPreference: true,
+        privacySettings: true,
+        photos: {
+          where: {
+            deletedAt: null,
+            uploadStatus: 'CONFIRMED',
+            moderationStatus: 'APPROVED',
+          },
+        },
+      },
+    });
+
+    if (!user) return;
+
+    // Do not downgrade an already COMPLETED user
+    if (user.onboardingStatus === 'COMPLETED') return;
+
+    // 1. profile row exists for the user
+    if (!user.profile) return;
+    const profile = user.profile;
+
+    // 2. profile.display_name exists and is not blank
+    if (!profile.displayName || profile.displayName.trim() === '') return;
+
+    // 3. profile.dob exists
+    if (!profile.dob) return;
+
+    // 4. calculated age from profile.dob is >= 18
+    const age = this.calculateAge(profile.dob);
+    if (age < 18) return;
+
+    // 5. profile.gender exists
+    if (!profile.gender) return;
+
+    // 6. profile.relationship_goal exists
+    if (!profile.relationshipGoal) return;
+
+    // 7. active real location exists in user_locations
+    if (!user.location) return;
+    const location = user.location;
+
+    // 8. active_location_mode = REAL
+    if (location.activeLocationMode !== 'REAL') return;
+
+    // 9. real_location is not null (we can't easily fetch PostGIS geography via include without raw query, so we check if it exists via raw query)
+    const locRows = await this.prisma.$queryRaw<any[]>`SELECT real_location FROM user_locations WHERE user_id = ${userId}::uuid AND real_location IS NOT NULL`;
+    if (!locRows || locRows.length === 0) return;
+
+    // 10. at least one profile photo exists that is: not deleted, CONFIRMED, APPROVED
+    if (user.photos.length === 0) return;
+
+    // 11. discovery_preferences row exists
+    if (!user.discoveryPreference) return;
+
+    // 12. user_privacy_settings row exists
+    if (!user.privacySettings) return;
+
+    // All requirements satisfied, update status
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        onboardingStatus: 'COMPLETED',
+        onboardingCompletedAt: new Date(),
+      },
+    });
   }
 }

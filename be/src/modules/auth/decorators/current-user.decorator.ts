@@ -5,6 +5,7 @@ export class AuthUser {
   email?: string;
   sessionId?: string;
   tokenType?: 'access' | 'refresh';
+  authContext?: 'normal' | 'pending_restore';
 }
 
 /**

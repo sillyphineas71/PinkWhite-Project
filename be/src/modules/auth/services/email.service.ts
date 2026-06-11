@@ -32,6 +32,13 @@ export class EmailService {
     }
   }
 
+  private maskEmail(email: string): string {
+    const [local, domain] = email.split('@');
+    if (!local || !domain) return email;
+    if (local.length <= 2) return `**@${domain}`;
+    return `${local[0]}***@${domain}`;
+  }
+
   /**
    * Gửi email xác thực — UC005
    */
@@ -51,11 +58,7 @@ export class EmailService {
       `,
     });
 
-    this.logger.log(`Verification email sent to: ${email}`);
-    if (info.message) {
-      // jsonTransport mode — log the email content
-      this.logger.debug(`[MOCK EMAIL] ${info.message}`);
-    }
+    this.logger.log(`Verification email queued/sent to: ${this.maskEmail(email)}`);
   }
 
   /**
@@ -76,9 +79,6 @@ export class EmailService {
       `,
     });
 
-    this.logger.log(`Reset password email sent to: ${email}`);
-    if (info.message) {
-      this.logger.debug(`[MOCK EMAIL] ${info.message}`);
-    }
+    this.logger.log(`Reset password email queued/sent to: ${this.maskEmail(email)}`);
   }
 }

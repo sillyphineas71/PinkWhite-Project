@@ -434,7 +434,7 @@ Implement secure refresh token rotation: verify old token, rotate hash, issue ne
 
 - UC-AUTH-001
 
-**Status:** Planned
+**Status:** Completed
 **Priority:** P0
 **Risk:** High
 **Depends on:** T-002, T-003, T-005
@@ -455,9 +455,9 @@ Update register flow to create all initial records in a single DB transaction.
 
 **Acceptance criteria:**
 
-- [ ] Register creates 5 DB records in a transaction.
-- [ ] Transaction rolls back on any failure.
-- [ ] Build passes, tests pass.
+- [x] Register creates 5 DB records in a transaction.
+- [x] Transaction rolls back on any failure.
+- [x] Build passes, tests pass.
 
 **Verification:**
 
@@ -469,7 +469,7 @@ Update register flow to create all initial records in a single DB transaction.
 
 - UC-AUTH-006
 
-**Status:** Planned
+**Status:** Completed
 **Priority:** P0
 **Risk:** Medium
 **Depends on:** T-005
@@ -489,8 +489,8 @@ Update verify email flow to use Prisma-backed SecurityTokenRepository and update
 
 **Acceptance criteria:**
 
-- [ ] Verify email marks token used, sets email_verified_at, updates account_status.
-- [ ] Build passes, tests pass.
+- [x] Verify email marks token used, sets email_verified_at, updates account_status.
+- [x] Build passes, tests pass.
 
 ### T-014 — Implement forgot/reset password
 
@@ -498,7 +498,7 @@ Update verify email flow to use Prisma-backed SecurityTokenRepository and update
 
 - UC-AUTH-007, UC-AUTH-008
 
-**Status:** Planned
+**Status:** Completed
 **Priority:** P0
 **Risk:** Medium
 **Depends on:** T-002, T-003, T-005
@@ -518,10 +518,10 @@ Update forgot and reset password flows to use Prisma repositories.
 
 **Acceptance criteria:**
 
-- [ ] Forgot password creates security_token in DB.
-- [ ] Reset password updates correct auth_identity row.
-- [ ] Reset password revokes all sessions.
-- [ ] Build passes, tests pass.
+- [x] Forgot password creates security_token in DB.
+- [x] Reset password updates correct auth_identity row.
+- [x] Reset password revokes all sessions.
+- [x] Build passes, tests pass.
 
 ---
 
@@ -533,7 +533,7 @@ Update forgot and reset password flows to use Prisma repositories.
 
 - UC-PROFILE-001, UC-PROFILE-002
 
-**Status:** Planned
+**Status:** Completed
 **Priority:** P0
 **Risk:** Medium
 **Depends on:** T-001
@@ -555,8 +555,8 @@ Replace in-memory Map with Prisma profiles table. Map fullName to display_name.
 
 **Acceptance criteria:**
 
-- [ ] ProfileRepository uses Prisma.
-- [ ] Build passes.
+- [x] ProfileRepository uses Prisma.
+- [x] Build passes.
 
 ### T-016 — Update ProfileService for Prisma reads
 
@@ -564,7 +564,7 @@ Replace in-memory Map with Prisma profiles table. Map fullName to display_name.
 
 - UC-PROFILE-001, UC-PROFILE-002
 
-**Status:** Planned
+**Status:** Completed
 **Priority:** P0
 **Risk:** Low
 **Depends on:** T-015
@@ -578,8 +578,8 @@ Ensure ProfileService calls align with Prisma-backed repository. No behavior cha
 
 **Acceptance criteria:**
 
-- [ ] ProfileService reads/writes through Prisma.
-- [ ] Build passes, e2e passes.
+- [x] ProfileService reads/writes through Prisma.
+- [x] Build passes, e2e passes.
 
 ---
 
@@ -591,7 +591,7 @@ Ensure ProfileService calls align with Prisma-backed repository. No behavior cha
 
 - UC-PROFILE-004
 
-**Status:** Planned
+**Status:** Completed
 **Priority:** P1
 **Risk:** Medium
 **Depends on:** T-001
@@ -611,8 +611,8 @@ Replace in-memory Map with Prisma profile_photos table. Support metadata persist
 
 **Acceptance criteria:**
 
-- [ ] PhotoRepository uses Prisma.
-- [ ] Build passes.
+- [x] PhotoRepository uses Prisma.
+- [x] Build passes.
 
 ### T-018 — Implement LocationRepository with Prisma + PostGIS
 
@@ -620,7 +620,7 @@ Replace in-memory Map with Prisma profile_photos table. Support metadata persist
 
 - UC-PROFILE-005
 
-**Status:** Planned
+**Status:** Completed
 **Priority:** P1
 **Risk:** High
 **Depends on:** T-001
@@ -642,9 +642,9 @@ Replace in-memory Map with Prisma user_locations table using PostGIS geography(P
 
 **Acceptance criteria:**
 
-- [ ] LocationRepository uses Prisma + PostGIS.
-- [ ] No string concatenation of lat/lng.
-- [ ] Build passes.
+- [x] LocationRepository uses Prisma + PostGIS.
+- [x] No string concatenation of lat/lng.
+- [x] Build passes.
 
 **Verification:**
 
@@ -656,7 +656,7 @@ Replace in-memory Map with Prisma user_locations table using PostGIS geography(P
 
 - UC-PROFILE-006
 
-**Status:** Planned
+**Status:** Completed
 **Priority:** P1
 **Risk:** Low
 **Depends on:** T-001
@@ -675,8 +675,8 @@ Create Prisma-backed repository for discovery_preferences table.
 
 **Acceptance criteria:**
 
-- [ ] DiscoveryPreferencesRepository uses Prisma.
-- [ ] Build passes.
+- [x] DiscoveryPreferencesRepository uses Prisma.
+- [x] Build passes.
 
 ### T-020 — Implement UserPrivacySettingsRepository with Prisma
 
@@ -684,7 +684,7 @@ Create Prisma-backed repository for discovery_preferences table.
 
 - UC-PROFILE-006
 
-**Status:** Planned
+**Status:** Completed
 **Priority:** P1
 **Risk:** Low
 **Depends on:** T-001
@@ -702,8 +702,8 @@ Replace empty stub with Prisma-backed repository for user_privacy_settings table
 
 **Acceptance criteria:**
 
-- [ ] UserPrivacySettingsRepository uses Prisma.
-- [ ] Build passes.
+- [x] UserPrivacySettingsRepository uses Prisma.
+- [x] Build passes.
 
 ---
 
@@ -715,7 +715,7 @@ Replace empty stub with Prisma-backed repository for user_privacy_settings table
 
 - UC-PROFILE-003
 
-**Status:** Planned
+**Status:** Completed
 **Priority:** P0
 **Risk:** Medium
 **Depends on:** T-015, T-017, T-018, T-019, T-020
@@ -735,9 +735,9 @@ Update onboarding evaluator to check all conditions against Prisma-backed data.
 
 **Acceptance criteria:**
 
-- [ ] Onboarding evaluator checks all conditions via DB.
-- [ ] Onboarding sets correct fields when all conditions met.
-- [ ] Build passes, tests pass.
+- [x] Onboarding evaluator checks all conditions via DB.
+- [x] Onboarding sets correct fields when all conditions met.
+- [x] Build passes, tests pass.
 
 ### T-022 — Fix ProfileController route ordering
 
@@ -796,3 +796,54 @@ Remove any runtime mock leftovers that are no longer needed after all repositori
 
 - [ ] No runtime mock code in auth/profile repositories.
 - [ ] Build passes, tests pass.
+# # #   B a t c h   6 F      F i n a l   S t a b i l i t y   F i x   B e f o r e   P h a s e   1   C o m m i t 
+ 
+ * * S t a t u s : * *   C o m p l e t e d 
+ 
+ * * D e f e r r e d   i t e m s   r e m a i n   d o c u m e n t e d   a n d   n o t   m a r k e d   c o m p l e t e d : * * 
+ -   . e n v / k e y / S M T P   c o n f i g 
+ -   p r o d u c t i o n   e m a i l   l o g g i n g   p o l i c y 
+ -   d i s c o v e r y   f e e d 
+ -   d i s c o v e r a b i l i t y   f i l t e r i n g 
+ -   S 3 / u p l o a d 
+ -   J W T   D B   s e s s i o n   v a l i d a t i o n 
+ -   G o o g l e   O A u t h   p e r s i s t e n c e 
+ -   a n o n y m i z a t i o n   j o b 
+  
+ # # #   B a t c h   6 G      R e s t o r e   A c c o u n t   +   S o f t   D e l e t e   T r a n s a c t i o n   F i x 
+ 
+ * * S t a t u s : * *   C o m p l e t e d 
+ 
+ * * D e f e r r e d   i t e m s   r e m a i n   d o c u m e n t e d : * * 
+ -   p u b l i c   r e s t o r e   t o k e n / e m a i l   f l o w 
+ -   a n o n y m i z a t i o n   j o b 
+ -   p e r m a n e n t   d e l e t e 
+ -   J W T   D B   s e s s i o n   v a l i d a t i o n 
+ -   d i s c o v e r y   f e e d 
+ -   S 3 / u p l o a d 
+  
+ # # #   B a t c h   6 H      P e n d i n g   R e s t o r e   A c c e s s   B o u n d a r y   F i x 
+ 
+ * * S t a t u s : * *   C o m p l e t e d 
+ 
+ * * D e f e r r e d   i t e m s   r e m a i n   d o c u m e n t e d : * * 
+ -   p u b l i c   r e s t o r e   t o k e n / e m a i l   f l o w 
+ -   a n o n y m i z a t i o n   j o b 
+ -   p e r m a n e n t   d e l e t e 
+ -   f u l l   J W T   D B   s e s s i o n   v a l i d a t i o n 
+ -   d i s c o v e r y   f e e d 
+ -   S 3 / u p l o a d 
+  
+ # # #   B a t c h   6 I      F i n a l   B u i l d - D r i v e n   R e p a i r   B e f o r e   P h a s e   1   C o m m i t 
+ 
+ * * S t a t u s : * *   C o m p l e t e d 
+ 
+ * * D e f e r r e d   i t e m s   r e m a i n   d o c u m e n t e d : * * 
+ -   p u b l i c   r e s t o r e   t o k e n / e m a i l   f l o w 
+ -   a n o n y m i z a t i o n   j o b 
+ -   p e r m a n e n t   d e l e t e 
+ -   f u l l   J W T   D B   s e s s i o n   v a l i d a t i o n 
+ -   d i s c o v e r y   f e e d 
+ -   S 3 / u p l o a d 
+  
+ 

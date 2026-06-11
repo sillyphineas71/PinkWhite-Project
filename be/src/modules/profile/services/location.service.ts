@@ -2,16 +2,21 @@ import {
   Injectable,
   BadRequestException,
   ForbiddenException,
+  NotImplementedException,
 } from '@nestjs/common';
 import {
   LocationRepository,
   LocationEntity,
 } from '../repositories/location.repository';
 import { UpdateLocationDto, UpdatePassportDto } from '../dto/profile.dto';
+import { ProfileService } from './profile.service';
 
 @Injectable()
 export class LocationService {
-  constructor(private readonly locationRepo: LocationRepository) {}
+  constructor(
+    private readonly locationRepo: LocationRepository,
+    private readonly profileService: ProfileService,
+  ) {}
 
   // Haversine formula
   private getDistanceInMeters(
@@ -58,14 +63,12 @@ export class LocationService {
     }
 
     await this.locationRepo.upsertGPS(userId, dto.lat, dto.lng);
+
+    await this.profileService.evaluateOnboarding(userId);
   }
 
   async updatePassport(userId: string, dto: UpdatePassportDto): Promise<void> {
-    // In real app, check Premium subscription here.
-    // Mock assumption: User is Premium.
-    // if (!isPremium(userId)) throw new ForbiddenException(...);
-
-    await this.locationRepo.upsertPassport(userId, dto.lat, dto.lng);
+    throw new NotImplementedException('Passport location not implemented in Phase 1');
   }
 
   async getActiveLocation(
@@ -73,14 +76,6 @@ export class LocationService {
   ): Promise<{ lat: number; lng: number; isPassport: boolean } | null> {
     const loc = await this.locationRepo.findByUserId(userId);
     if (!loc) return null;
-
-    // Check premium expiry fallback here
-    // const hasPremium = checkPremium(userId);
-    const hasPremium = true; // Mock assumption
-
-    if (loc.isPassport && hasPremium && loc.passportLat && loc.passportLng) {
-      return { lat: loc.passportLat, lng: loc.passportLng, isPassport: true };
-    }
 
     return { lat: loc.latitude, lng: loc.longitude, isPassport: false };
   }

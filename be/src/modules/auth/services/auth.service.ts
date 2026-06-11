@@ -13,8 +13,8 @@ import { Response, Request } from 'express';
 import * as crypto from 'crypto';
 import { UserRepository } from '../repositories/user.repository';
 import { SessionRepository } from '../repositories/session.repository';
-import { VerificationTokenRepository } from '../repositories/verification-token.repository';
-import { ResetPasswordTokenRepository } from '../repositories/reset-password-token.repository';
+import { SecurityTokenRepository } from '../repositories/security-token.repository';
+import { PrismaService } from '../../../database/prisma.service';
 import { TokenService } from './token.service';
 import { EmailService } from './email.service';
 import { normalizeEmail } from '../utils/email-normalize.util';
@@ -34,11 +34,11 @@ export class AuthService {
   constructor(
     private readonly userRepo: UserRepository,
     private readonly sessionRepo: SessionRepository,
-    private readonly verifyTokenRepo: VerificationTokenRepository,
-    private readonly resetTokenRepo: ResetPasswordTokenRepository,
     private readonly tokenService: TokenService,
     private readonly emailService: EmailService,
     private readonly configService: ConfigService,
+    private readonly prisma: PrismaService,
+    private readonly securityTokenRepo: SecurityTokenRepository,
   ) {
     this.bcryptRounds = this.configService.get<number>('BCRYPT_ROUNDS', 10);
   }
@@ -54,13 +54,53 @@ export class AuthService {
     }
 
     const passwordHash = await hashPassword(trimmedPassword, this.bcryptRounds);
-    const user = await this.userRepo.create({
-      email: normalized,
-      passwordHash,
+    const token = generateSecureToken();
+    const tokenHash = hashToken(token);
+
+    const user = await this.prisma.$transaction(async (tx: any) => {
+      // 1. Create user and 2. auth identity
+      const createdUser = await this.userRepo.create(
+        {
+          email: normalized,
+          passwordHash,
+        },
+        tx,
+      );
+
+      // 3. Create discovery preferences
+      await tx.discoveryPreference.create({
+        data: {
+          userId: createdUser.id,
+          minAge: 18,
+          maxAge: 100,
+          maxDistanceKm: 100,
+          preferredGenders: ['MALE', 'FEMALE', 'NON_BINARY', 'OTHER'],
+        },
+      });
+
+      // 4. Create user privacy settings
+      await tx.userPrivacySettings.create({
+        data: {
+          userId: createdUser.id,
+        },
+      });
+
+      // 5. Create email verification security token
+      await this.securityTokenRepo.create(
+        {
+          userId: createdUser.id,
+          tokenType: 'EMAIL_VERIFICATION',
+          tokenHash,
+          expiresAt: new Date(Date.now() + 15 * 60 * 1000), // 15 mins TTL
+        },
+        tx,
+      );
+
+      return createdUser;
     });
 
-    // Trigger UC005: send verification email
-    await this.sendVerificationEmail(normalized);
+    // 11. Email delivery happens after transaction
+    await this.emailService.sendVerificationEmail(normalized, token);
 
     this.logger.log(
       JSON.stringify({
@@ -103,36 +143,49 @@ export class AuthService {
           action: 'LOGIN_FAILED',
           reason: 'invalid_password',
           email: this.maskEmail(normalized),
-          ip: req.ip,
           timestamp: new Date().toISOString(),
         }),
       );
       throw new UnauthorizedException('Email hoặc mật khẩu không chính xác');
     }
 
-    // Check account status: block SUSPENDED, BANNED, DELETED with generic failure
-    // Allow only ACTIVE and PENDING_EMAIL_VERIFICATION
+    // SUSPENDED or BANNED -> blocked
     if (
       user.accountStatus === 'SUSPENDED' ||
-      user.accountStatus === 'BANNED' ||
-      user.accountStatus === 'DELETED'
+      user.accountStatus === 'BANNED'
     ) {
       throw new UnauthorizedException('Email hoặc mật khẩu không chính xác');
     }
 
-    // Soft deleted user with deletedAt — also block with generic failure
-    if (user.deletedAt) {
-      throw new UnauthorizedException('Email hoặc mật khẩu không chính xác');
+    let isPendingRestore = false;
+    if (user.accountStatus === 'DELETED' || user.deletedAt) {
+      if (
+        user.accountStatus === 'DELETED' &&
+        user.deletedAt &&
+        user.deletionScheduledAt &&
+        user.deletionScheduledAt.getTime() > Date.now()
+      ) {
+        // Within restore window -> allow login but in pending restore mode
+        isPendingRestore = true;
+      } else {
+        // Expired restore window or hard deleted -> block
+        throw new UnauthorizedException('Email hoặc mật khẩu không chính xác');
+      }
     }
 
-    // ACTIVE or PENDING_EMAIL_VERIFICATION — allow login
-    await this.issueTokens(user.id, user.email, res, req);
+    // ACTIVE or PENDING_EMAIL_VERIFICATION or Pending Restore — allow login
+    await this.issueTokens(
+      user.id,
+      user.email,
+      res,
+      req,
+      isPendingRestore ? 'pending_restore' : 'normal'
+    );
 
     this.logger.log(
       JSON.stringify({
         action: 'LOGIN_SUCCESS',
         userId: user.id,
-        ip: req.ip,
         timestamp: new Date().toISOString(),
       }),
     );
@@ -143,6 +196,7 @@ export class AuthService {
         id: user.id,
         email: user.email,
         isOnboarded: user.isOnboarded,
+        ...(isPendingRestore && { pendingRestore: true }),
       },
     };
   }
@@ -178,30 +232,21 @@ export class AuthService {
     if (!user) {
       throw new UnauthorizedException();
     }
-    if (user.isBanned) {
+    if (
+      user.accountStatus === 'SUSPENDED' ||
+      user.accountStatus === 'BANNED' ||
+      user.accountStatus === 'DELETED' ||
+      user.deletedAt
+    ) {
       this.logger.warn(
         JSON.stringify({
-          action: 'BANNED_USER_ACCESS',
+          action: 'INVALID_ACCOUNT_ACCESS',
           userId,
+          status: user.accountStatus,
           timestamp: new Date().toISOString(),
         }),
       );
-      throw new ForbiddenException('Tài khoản của bạn đã bị khóa');
-    }
-    if (user.deletedAt) {
-      const daysSinceDelete =
-        (Date.now() - user.deletedAt.getTime()) / (1000 * 60 * 60 * 24);
-      if (daysSinceDelete > 30) {
-        throw new ForbiddenException('Tài khoản không còn hoạt động');
-      }
-      // pendingRestore — return limited info
-      return {
-        id: user.id,
-        email: user.email,
-        isOnboarded: user.isOnboarded,
-        isEmailVerified: user.isEmailVerified,
-        pendingRestore: true,
-      };
+      throw new ForbiddenException('Tài khoản của bạn không khả dụng');
     }
     return {
       id: user.id,
@@ -215,27 +260,28 @@ export class AuthService {
   async sendVerificationEmail(email: string) {
     const normalized = normalizeEmail(email);
     const user = await this.userRepo.findByEmail(normalized);
-    if (!user) {
-      throw new NotFoundException('Email không tồn tại');
+    if (
+      user &&
+      !user.isEmailVerified &&
+      !user.deletedAt &&
+      (user.accountStatus === 'ACTIVE' || user.accountStatus === 'PENDING_EMAIL_VERIFICATION')
+    ) {
+      // Invalidate old tokens
+      await this.securityTokenRepo.invalidateByUserIdAndType(user.id, 'EMAIL_VERIFICATION');
+
+      const token = generateSecureToken();
+      const tokenHash = hashToken(token);
+      await this.securityTokenRepo.create({
+        userId: user.id,
+        tokenType: 'EMAIL_VERIFICATION',
+        tokenHash,
+        expiresAt: new Date(Date.now() + 15 * 60 * 1000), // 15 min
+      });
+
+      await this.emailService.sendVerificationEmail(normalized, token);
     }
-    if (user.isEmailVerified) {
-      throw new BadRequestException('Email đã được xác thực');
-    }
 
-    // Invalidate old tokens
-    await this.verifyTokenRepo.deleteAllByEmail(normalized);
-
-    const token = generateSecureToken();
-    const tokenHash = hashToken(token);
-    await this.verifyTokenRepo.create({
-      email: normalized,
-      tokenHash,
-      expiresAt: new Date(Date.now() + 15 * 60 * 1000), // 15 min
-    });
-
-    await this.emailService.sendVerificationEmail(normalized, token);
-
-    return { message: 'Email xác thực đã được gửi.' };
+    return { message: 'Nếu email hợp lệ, email xác thực sẽ được gửi.' };
   }
 
   // ===== UC005: Verify Email (Confirm) =====
@@ -247,26 +293,58 @@ export class AuthService {
   ) {
     const normalized = normalizeEmail(email);
     const tokenHash = hashToken(token);
-    const storedToken = await this.verifyTokenRepo.findByTokenHash(tokenHash);
+    const storedToken = await this.securityTokenRepo.findByTokenHash(tokenHash);
 
-    if (!storedToken || storedToken.email !== normalized) {
-      throw new BadRequestException('Token không hợp lệ hoặc đã hết hạn');
+    if (
+      !storedToken ||
+      storedToken.tokenType !== 'EMAIL_VERIFICATION' ||
+      storedToken.usedAt
+    ) {
+      throw new BadRequestException('Token xác thực không hợp lệ hoặc đã hết hạn');
     }
     if (storedToken.expiresAt < new Date()) {
-      throw new BadRequestException('Token không hợp lệ hoặc đã hết hạn');
+      throw new BadRequestException('Token xác thực không hợp lệ hoặc đã hết hạn');
     }
 
-    const user = await this.userRepo.findByEmail(normalized);
-    if (!user) {
-      throw new NotFoundException('Email không tồn tại');
-    }
-    if (user.isEmailVerified) {
-      throw new BadRequestException('Email đã được xác thực');
+    const user = await this.userRepo.findById(storedToken.userId);
+    if (!user || user.email !== normalized) {
+      throw new BadRequestException('Token xác thực không hợp lệ hoặc đã hết hạn');
     }
 
-    // Transaction: verify + delete token + create session
-    await this.userRepo.setEmailVerified(normalized);
-    await this.verifyTokenRepo.deleteById(storedToken.id);
+    if (
+      user.deletedAt ||
+      user.accountStatus === 'BANNED' ||
+      user.accountStatus === 'SUSPENDED' ||
+      user.accountStatus === 'DELETED'
+    ) {
+      throw new BadRequestException('Token xác thực không hợp lệ hoặc đã hết hạn');
+    }
+
+    // Transaction: verify + create session
+    await this.prisma.$transaction(async (tx: any) => {
+      // Mark token used
+      const result = await tx.securityToken.updateMany({
+        where: {
+          id: storedToken.id,
+          usedAt: null,
+          expiresAt: { gt: new Date() },
+        },
+        data: { usedAt: new Date() },
+      });
+      if (result.count !== 1) {
+        throw new BadRequestException('Token xác thực không hợp lệ hoặc đã hết hạn');
+      }
+
+      // Update user
+      const updateData: any = { emailVerifiedAt: new Date() };
+      if (user.accountStatus === 'PENDING_EMAIL_VERIFICATION') {
+        updateData.accountStatus = 'ACTIVE';
+      }
+      await tx.user.update({
+        where: { id: user.id },
+        data: updateData,
+      });
+    });
 
     // Issue JWT for the first time
     await this.issueTokens(user.id, user.email, res, req);
@@ -287,32 +365,32 @@ export class AuthService {
     const normalized = normalizeEmail(email);
     const user = await this.userRepo.findByEmail(normalized);
 
-    // Always return 200 to prevent user enumeration
-    if (!user) {
-      return {
-        message: 'Nếu email tồn tại, bạn sẽ nhận được link đặt lại mật khẩu.',
-      };
+    if (
+      user &&
+      !user.deletedAt &&
+      (user.accountStatus === 'ACTIVE' || user.accountStatus === 'PENDING_EMAIL_VERIFICATION')
+    ) {
+      await this.securityTokenRepo.invalidateByUserIdAndType(user.id, 'PASSWORD_RESET');
+
+      const token = generateSecureToken();
+      const tokenHash = hashToken(token);
+      await this.securityTokenRepo.create({
+        userId: user.id,
+        tokenType: 'PASSWORD_RESET',
+        tokenHash,
+        expiresAt: new Date(Date.now() + 15 * 60 * 1000),
+      });
+
+      await this.emailService.sendResetPasswordEmail(normalized, token);
+
+      this.logger.log(
+        JSON.stringify({
+          action: 'FORGOT_PASSWORD_REQUESTED',
+          userId: user.id,
+          timestamp: new Date().toISOString(),
+        }),
+      );
     }
-
-    await this.resetTokenRepo.deleteAllByEmail(normalized);
-
-    const token = generateSecureToken();
-    const tokenHash = hashToken(token);
-    await this.resetTokenRepo.create({
-      email: normalized,
-      tokenHash,
-      expiresAt: new Date(Date.now() + 15 * 60 * 1000),
-    });
-
-    await this.emailService.sendResetPasswordEmail(normalized, token);
-
-    this.logger.log(
-      JSON.stringify({
-        action: 'FORGOT_PASSWORD_REQUESTED',
-        email: this.maskEmail(normalized),
-        timestamp: new Date().toISOString(),
-      }),
-    );
 
     return {
       message: 'Nếu email tồn tại, bạn sẽ nhận được link đặt lại mật khẩu.',
@@ -323,26 +401,58 @@ export class AuthService {
   async resetPassword(token: string, newPassword: string) {
     const trimmed = newPassword.trim();
     const tokenHash = hashToken(token);
-    const storedToken = await this.resetTokenRepo.findByTokenHash(tokenHash);
+    const storedToken = await this.securityTokenRepo.findByTokenHash(tokenHash);
 
-    if (!storedToken) {
-      throw new BadRequestException('Token không hợp lệ hoặc đã hết hạn');
+    if (
+      !storedToken ||
+      storedToken.tokenType !== 'PASSWORD_RESET' ||
+      storedToken.usedAt
+    ) {
+      throw new BadRequestException('Token đặt lại mật khẩu không hợp lệ hoặc đã hết hạn');
     }
     if (storedToken.expiresAt < new Date()) {
-      throw new BadRequestException('Token không hợp lệ hoặc đã hết hạn');
+      throw new BadRequestException('Token đặt lại mật khẩu không hợp lệ hoặc đã hết hạn');
     }
 
-    const user = await this.userRepo.findByEmail(storedToken.email);
+    const user = await this.userRepo.findById(storedToken.userId);
     if (!user) {
-      throw new BadRequestException('Token không hợp lệ hoặc đã hết hạn');
+      throw new BadRequestException('Token đặt lại mật khẩu không hợp lệ hoặc đã hết hạn');
+    }
+
+    if (
+      user.deletedAt ||
+      user.accountStatus === 'BANNED' ||
+      user.accountStatus === 'SUSPENDED' ||
+      user.accountStatus === 'DELETED'
+    ) {
+      throw new BadRequestException('Token đặt lại mật khẩu không hợp lệ hoặc đã hết hạn');
     }
 
     const passwordHash = await hashPassword(trimmed, this.bcryptRounds);
 
-    // Transaction: update password + delete token + revoke all sessions (Q2)
-    await this.userRepo.updatePasswordHash(user.id, passwordHash);
-    await this.resetTokenRepo.deleteById(storedToken.id);
-    await this.sessionRepo.deleteAllByUserId(user.id);
+    await this.prisma.$transaction(async (tx: any) => {
+      const result = await tx.securityToken.updateMany({
+        where: {
+          id: storedToken.id,
+          usedAt: null,
+          expiresAt: { gt: new Date() },
+        },
+        data: { usedAt: new Date() },
+      });
+      if (result.count !== 1) {
+        throw new BadRequestException('Token đặt lại mật khẩu không hợp lệ hoặc đã hết hạn');
+      }
+
+      const updateResult = await tx.authIdentity.updateMany({
+        where: { userId: user.id, provider: 'EMAIL' },
+        data: { passwordHash },
+      });
+      if (updateResult.count === 0) {
+        throw new BadRequestException('Token đặt lại mật khẩu không hợp lệ hoặc đã hết hạn');
+      }
+    });
+
+    await this.sessionRepo.revokeAllByUserId(user.id, 'password_reset');
 
     this.logger.log(
       JSON.stringify({
@@ -486,8 +596,12 @@ export class AuthService {
     }
 
     // Transaction: soft delete + revoke all sessions (Q5)
-    await this.userRepo.softDelete(userId);
-    const sessionCount = await this.sessionRepo.deleteAllByUserId(userId);
+    let sessionCount = 0;
+    await this.prisma.$transaction(async (tx: any) => {
+      await this.userRepo.softDelete(userId, tx);
+      sessionCount = await this.sessionRepo.revokeAllByUserId(userId, 'account_deleted', tx);
+    });
+    
     this.tokenService.clearAuthCookies(res);
 
     this.logger.log(
@@ -511,13 +625,11 @@ export class AuthService {
       throw new UnauthorizedException();
     }
 
-    if (!user.deletedAt) {
+    if (!user.deletedAt || user.accountStatus !== 'DELETED') {
       throw new BadRequestException('Tài khoản không cần khôi phục');
     }
 
-    const daysSinceDelete =
-      (Date.now() - user.deletedAt.getTime()) / (1000 * 60 * 60 * 24);
-    if (daysSinceDelete > 30) {
+    if (!user.deletionScheduledAt || user.deletionScheduledAt.getTime() < Date.now()) {
       throw new GoneException('Tài khoản đã bị xóa vĩnh viễn');
     }
 
@@ -561,6 +673,19 @@ export class AuthService {
       throw new UnauthorizedException('Invalid refresh token');
     }
 
+    if (payload.auth_context === 'pending_restore') {
+      const user = await this.userRepo.findById(payload.sub);
+      if (
+        !user ||
+        user.accountStatus !== 'DELETED' ||
+        !user.deletedAt ||
+        !user.deletionScheduledAt ||
+        user.deletionScheduledAt.getTime() <= Date.now()
+      ) {
+        throw new UnauthorizedException('Invalid refresh token');
+      }
+    }
+
     const oldHash = hashToken(refreshTokenCookie);
     const newJti = crypto.randomUUID();
 
@@ -569,6 +694,7 @@ export class AuthService {
       email: payload.email,
       session_id: payload.session_id,
       token_type: 'access' as const,
+      auth_context: payload.auth_context || 'normal',
     };
 
     const newRefreshTokenPayload = {
@@ -577,6 +703,7 @@ export class AuthService {
       session_id: payload.session_id,
       jti: newJti,
       token_type: 'refresh' as const,
+      auth_context: payload.auth_context || 'normal',
     };
 
     const newAccessToken = this.tokenService.signAccessToken(newAccessTokenPayload);
@@ -631,47 +758,44 @@ export class AuthService {
     email: string,
     res: Response,
     req: Request,
+    authContext: 'normal' | 'pending_restore' = 'normal',
   ) {
-    // Step 1: Create session with temporary placeholder hash
-    const placeholderHash = hashToken(crypto.randomUUID());
-    const session = await this.sessionRepo.create({
-      userId,
-      refreshTokenHash: placeholderHash,
-      userAgent: req.headers['user-agent'],
-      ipAddress: req.ip,
-      expiresAt: this.tokenService.getRefreshTokenExpiry(),
-    });
-
-    // Step 2: Generate jti for refresh token
+    // Step 1: Generate session id and jti
+    const sessionId = crypto.randomUUID();
     const jti = crypto.randomUUID();
 
-    // Step 3: Create tokens with session_id and jti
+    // Step 2: Create tokens
     const accessTokenPayload = {
       sub: userId,
       email,
-      session_id: session.id,
+      session_id: sessionId,
       token_type: 'access' as const,
+      auth_context: authContext,
     };
     const refreshTokenPayload = {
       sub: userId,
       email,
-      session_id: session.id,
+      session_id: sessionId,
       jti,
       token_type: 'refresh' as const,
+      auth_context: authContext,
     };
 
     const accessToken = this.tokenService.signAccessToken(accessTokenPayload);
     const refreshToken = this.tokenService.signRefreshToken(refreshTokenPayload);
 
-    // Step 4: Hash the actual refresh token
+    // Step 3: Hash the real refresh token
     const refreshTokenHash = hashToken(refreshToken);
 
-    // Step 5: Update session with real hash
-    await this.sessionRepo.updateTokenHash(
-      session.id,
+    // Step 4: Create session directly with real hash
+    await this.sessionRepo.create({
+      id: sessionId,
+      userId,
       refreshTokenHash,
-      this.tokenService.getRefreshTokenExpiry(),
-    );
+      userAgent: req.headers['user-agent'],
+      ipAddress: req.socket?.remoteAddress as string | undefined,
+      expiresAt: this.tokenService.getRefreshTokenExpiry(),
+    });
 
     // Step 6: Set cookies
     this.tokenService.setAuthCookies(res, accessToken, refreshToken);

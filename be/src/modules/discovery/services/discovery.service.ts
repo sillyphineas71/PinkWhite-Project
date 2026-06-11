@@ -14,7 +14,9 @@ import { ProfileRepository } from '../../profile/repositories/profile.repository
 import { LocationRepository } from '../../profile/repositories/location.repository';
 import { PhotoRepository } from '../../profile/repositories/photo.repository';
 import { SwipeRepository } from '../../swipe/repositories/swipe.repository';
+import { UserPrivacySettingsRepository } from '../../profile/repositories/user-privacy-settings.repository';
 import { calculateHaversineDistance } from '../utils/geo.util';
+import { NotImplementedException } from '@nestjs/common';
 
 @Injectable()
 export class DiscoveryService {
@@ -27,6 +29,7 @@ export class DiscoveryService {
     private readonly locationRepo: LocationRepository,
     private readonly photoRepo: PhotoRepository,
     private readonly swipeRepo: SwipeRepository,
+    private readonly privacyRepo: UserPrivacySettingsRepository,
   ) {}
 
   async createPreferences(userId: string, dto: CreatePreferenceDto) {
@@ -98,123 +101,24 @@ export class DiscoveryService {
     const user = await this.userRepo.findById(userId);
     if (!user) throw new BadRequestException('User not found');
 
-    if (!user.isPremium) {
-      throw new ForbiddenException('Tính năng này yêu cầu gói Premium');
-    }
+    // Premium entitlement enforcement is deferred.
+    // if (!user.isPremium) {
+    //   throw new ForbiddenException('Tính năng này yêu cầu gói Premium');
+    // }
 
-    await this.userRepo.setIsHidden(userId, isHidden);
-    return { isHidden };
+    const settings = await this.privacyRepo.upsert(userId, { isHidden });
+    return { isHidden: settings.isHidden };
   }
 
   async getVisibility(userId: string) {
     const user = await this.userRepo.findById(userId);
     if (!user) throw new BadRequestException('User not found');
 
-    return { isHidden: user.isHidden };
+    const settings = await this.privacyRepo.findByUserId(userId);
+    return { isHidden: settings ? settings.isHidden : false };
   }
 
   async getFeed(userId: string, query: GetFeedQueryDto) {
-    const user = await this.userRepo.findById(userId);
-    if (!user) throw new BadRequestException('User not found');
-
-    const prefs = await this.preferenceRepo.findByUserId(userId);
-    if (!prefs) {
-      throw new BadRequestException(
-        'Vui lòng thiết lập Preferences trước khi xem Feed',
-      );
-    }
-
-    const userLocation = await this.locationRepo.findByUserId(userId);
-    if (!userLocation) {
-      throw new BadRequestException('Vui lòng bật GPS để tìm người xung quanh');
-    }
-
-    // We need a method to get all profiles. I will assume we can get them all for the mock.
-    // In production, this would be a complex PostGIS or Bounding Box query.
-    const allUsers = await this.userRepo.findAll();
-    const allProfiles = await this.profileRepo.findAll();
-    const allLocations = await this.locationRepo.findAll();
-    const allPhotos = await this.photoRepo.findAll();
-    const swipedTargetIds = await this.swipeRepo.findSwipedTargetIds(userId);
-
-    const now = new Date();
-    const fortyEightHoursAgo = new Date(now.getTime() - 48 * 60 * 60 * 1000);
-
-    let candidates = [];
-
-    for (const targetUser of allUsers) {
-      if (targetUser.id === userId) continue;
-      if (!targetUser.isOnboarded || targetUser.isBanned || targetUser.deletedAt || targetUser.isHidden) continue;
-      if (swipedTargetIds.includes(targetUser.id)) continue;
-
-      const targetProfile = allProfiles.find(p => p.userId === targetUser.id);
-      if (!targetProfile) continue;
-
-      const targetPhotos = allPhotos.filter(p => p.userId === targetUser.id);
-      if (targetPhotos.length === 0) continue;
-
-      // Gender filter
-      if (prefs.genderFilter !== 'ALL') {
-        if (targetProfile.gender !== prefs.genderFilter) continue;
-      }
-
-      // Age filter
-      const targetAge = new Date().getFullYear() - targetProfile.dob.getFullYear();
-      if (targetAge < prefs.minAge || targetAge > prefs.maxAge) continue;
-
-      // Distance filter
-      const targetLocation = allLocations.find(l => l.userId === targetUser.id);
-      if (!targetLocation) continue;
-
-      const distance = calculateHaversineDistance(
-        userLocation.latitude,
-        userLocation.longitude,
-        targetLocation.latitude,
-        targetLocation.longitude,
-      );
-
-      if (distance > prefs.maxDistance) continue;
-
-      // Calculate Boost
-      // Note (Spam Prevention): In a real app, we'd check if email/deviceId is truly new.
-      // For this mock, we assume all users created in last 48h are boosted.
-      const isBoosted = targetUser.createdAt > fortyEightHoursAgo;
-
-      candidates.push({
-        userId: targetUser.id,
-        profile: targetProfile,
-        distance,
-        isBoosted,
-        photos: targetPhotos,
-      });
-    }
-
-    // Sort by Boost Priority, then Distance
-    candidates.sort((a, b) => {
-      if (a.isBoosted && !b.isBoosted) return -1;
-      if (!a.isBoosted && b.isBoosted) return 1;
-      return a.distance - b.distance;
-    });
-
-    // Pagination (mocking cursor with simple offset for now since it's an array)
-    const limit = query.limit || 20;
-    const startIndex = query.cursor ? candidates.findIndex(c => c.userId === query.cursor) + 1 : 0;
-    const paginated = candidates.slice(startIndex, startIndex + limit);
-
-    const hasMore = startIndex + limit < candidates.length;
-    const nextCursor = paginated.length > 0 ? paginated[paginated.length - 1].userId : null;
-
-    return {
-      data: paginated.map(c => ({
-        userId: c.userId,
-        fullName: c.profile.fullName,
-        age: new Date().getFullYear() - c.profile.dob.getFullYear(),
-        bio: c.profile.bio,
-        distance: Math.round(c.distance),
-        photos: c.photos.map(p => p.url),
-      })),
-      nextCursor,
-      hasMore,
-    };
+    throw new NotImplementedException('Discovery feed not implemented in Phase 1');
   }
 }

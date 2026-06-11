@@ -13,6 +13,7 @@ export interface UserEntity {
   isPremium: boolean;
   isHidden: boolean;
   deletedAt: Date | null;
+  deletionScheduledAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -106,15 +107,25 @@ export class UserRepository {
     const client = this.client(tx);
     await client.user.update({
       where: { id },
-      data: { deletedAt: new Date() },
+      data: {
+        deletedAt: new Date(),
+        deletionScheduledAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        accountStatus: 'DELETED',
+      },
     });
   }
 
   async restore(id: string, tx?: Prisma.TransactionClient): Promise<void> {
     const client = this.client(tx);
+    const user = await client.user.findUnique({ where: { id } });
+    if (!user) return;
     await client.user.update({
       where: { id },
-      data: { deletedAt: null },
+      data: {
+        deletedAt: null,
+        deletionScheduledAt: null,
+        accountStatus: user.emailVerifiedAt ? 'ACTIVE' : 'PENDING_EMAIL_VERIFICATION',
+      },
     });
   }
 
@@ -131,14 +142,17 @@ export class UserRepository {
 
   async setIsHidden(id: string, value: boolean, tx?: Prisma.TransactionClient): Promise<void> {
     const client = this.client(tx);
-    // Hidden mode is stored in user_privacy_settings; upsert for compatibility
-    const settings = await client.userPrivacySettings.findUnique({ where: { userId: id } });
-    if (settings) {
-      await client.userPrivacySettings.update({
-        where: { userId: id },
-        data: { isHidden: value },
-      });
-    }
+    await client.userPrivacySettings.upsert({
+      where: { userId: id },
+      create: {
+        userId: id,
+        isHidden: value,
+        showDistance: true,
+        showOnlineStatus: true,
+        showLastActive: true,
+      },
+      update: { isHidden: value },
+    });
   }
 
   async findAll(): Promise<UserEntity[]> {
@@ -150,7 +164,7 @@ export class UserRepository {
 
   // ---- Mapping helpers ----
 
-  private toEntity(user: { id: string; email: string; emailVerifiedAt: Date | null; accountStatus: string; onboardingStatus: string; deletedAt: Date | null; createdAt: Date; updatedAt: Date }, passwordHash: string | null): UserEntity {
+  private toEntity(user: { id: string; email: string; emailVerifiedAt: Date | null; accountStatus: string; onboardingStatus: string; deletedAt: Date | null; deletionScheduledAt: Date | null; createdAt: Date; updatedAt: Date }, passwordHash: string | null): UserEntity {
     return {
       id: user.id,
       email: user.email,
@@ -162,12 +176,13 @@ export class UserRepository {
       isPremium: false,
       isHidden: false,
       deletedAt: user.deletedAt,
+      deletionScheduledAt: user.deletionScheduledAt,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
     };
   }
 
-  private toEntityFull(user: { id: string; email: string; emailVerifiedAt: Date | null; accountStatus: string; onboardingStatus: string; deletedAt: Date | null; createdAt: Date; updatedAt: Date; authIdentities: Array<{ passwordHash: string | null }> }): UserEntity {
+  private toEntityFull(user: { id: string; email: string; emailVerifiedAt: Date | null; accountStatus: string; onboardingStatus: string; deletedAt: Date | null; deletionScheduledAt: Date | null; createdAt: Date; updatedAt: Date; authIdentities: Array<{ passwordHash: string | null }> }): UserEntity {
     const emailIdentity = user.authIdentities?.[0];
     return {
       id: user.id,
@@ -180,6 +195,7 @@ export class UserRepository {
       isPremium: false,
       isHidden: false,
       deletedAt: user.deletedAt,
+      deletionScheduledAt: user.deletionScheduledAt,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
     };

@@ -9,12 +9,14 @@ import { LocationService } from './services/location.service';
 import { ProfileRepository } from './repositories/profile.repository';
 import { PhotoRepository } from './repositories/photo.repository';
 import { LocationRepository } from './repositories/location.repository';
+import { UserPrivacySettingsRepository } from './repositories/user-privacy-settings.repository';
 
 // Need to inject UserRepository for updating isOnboarded flag
 import { AuthModule } from '../auth/auth.module';
+import { DatabaseModule } from '../../database/database.module';
 
 @Module({
-  imports: [AuthModule],
+  imports: [AuthModule, DatabaseModule],
   controllers: [ProfileController],
   providers: [
     ProfileService,
@@ -23,6 +25,7 @@ import { AuthModule } from '../auth/auth.module';
     ProfileRepository,
     PhotoRepository,
     LocationRepository,
+    UserPrivacySettingsRepository,
   ],
   exports: [
     ProfileService,
@@ -30,6 +33,7 @@ import { AuthModule } from '../auth/auth.module';
     ProfileRepository,
     PhotoRepository,
     LocationRepository,
+    UserPrivacySettingsRepository,
   ],
 })
 export class ProfileModule {}

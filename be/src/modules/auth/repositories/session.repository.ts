@@ -1,13 +1,14 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../database/prisma.service';
+import { hashToken } from '../utils/hash.util';
 
 export interface SessionEntity {
   id: string;
   userId: string;
   refreshTokenHash: string;
   userAgent: string | null;
-  ipAddress: string | null;
+  ipHash: string | null;
   expiresAt: Date;
   createdAt: Date;
 }
@@ -24,6 +25,7 @@ export class SessionRepository {
 
   async create(
     data: {
+      id?: string;
       userId: string;
       refreshTokenHash: string;
       userAgent?: string;
@@ -35,12 +37,13 @@ export class SessionRepository {
     const client = this.client(tx);
     const session = await client.userSession.create({
       data: {
+        id: data.id ?? crypto.randomUUID(),
         userId: data.userId,
         refreshTokenHash: data.refreshTokenHash,
         refreshTokenFamilyId: crypto.randomUUID(),
         sessionStatus: 'ACTIVE',
         userAgent: data.userAgent ?? null,
-        ipHash: data.ipAddress ?? null,
+        ipHash: data.ipAddress ? hashToken(data.ipAddress) : null,
         expiresAt: data.expiresAt,
       },
     });
@@ -81,17 +84,17 @@ export class SessionRepository {
     });
   }
 
-  async deleteAllByUserId(userId: string, tx?: Prisma.TransactionClient): Promise<number> {
+  async revokeAllByUserId(userId: string, reason: string = 'logout_all', tx?: Prisma.TransactionClient): Promise<number> {
     const client = this.client(tx);
     const result = await client.userSession.updateMany({
       where: { userId, sessionStatus: 'ACTIVE' },
       data: {
         sessionStatus: 'REVOKED',
         revokedAt: new Date(),
-        revokedReason: 'legacy_delete_all_by_user_id',
+        revokedReason: reason,
       },
     });
-    this.logger.debug(`Revoked ${result.count} sessions for user: ${userId}`);
+    this.logger.debug(`Revoked ${result.count} sessions for user: ${userId} with reason: ${reason}`);
     return result.count;
   }
   async updateTokenHash(
@@ -155,18 +158,6 @@ export class SessionRepository {
     });
   }
 
-  async revokeAllByUserId(userId: string, reason: string, tx?: Prisma.TransactionClient): Promise<number> {
-    const client = this.client(tx);
-    const result = await client.userSession.updateMany({
-      where: { userId, sessionStatus: 'ACTIVE' },
-      data: {
-        sessionStatus: 'REVOKED',
-        revokedAt: new Date(),
-        revokedReason: reason,
-      },
-    });
-    return result.count;
-  }
 
   async markCompromised(id: string, tx?: Prisma.TransactionClient): Promise<void> {
     const client = this.client(tx);
@@ -197,7 +188,7 @@ export class SessionRepository {
       userId: session.userId,
       refreshTokenHash: session.refreshTokenHash,
       userAgent: session.userAgent,
-      ipAddress: session.ipHash,
+      ipHash: session.ipHash,
       expiresAt: session.expiresAt,
       createdAt: session.createdAt,
     };

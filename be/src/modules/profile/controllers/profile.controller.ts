@@ -70,18 +70,6 @@ export class ProfileController {
     return { ...profile, photos, location };
   }
 
-  @Get(':id')
-  @ApiOperation({
-    summary: 'UC017, UC021, UC025, UC032: Đọc Aggregated Profile (Other User)',
-  })
-  async getUserProfile(@Param('id') userId: string) {
-    const profile = await this.profileService.getProfile(userId, false);
-    const photos = await this.photoService.getGallery(userId);
-    // Usually we don't expose exact location to other users, maybe just distance.
-    // We'll omit location here for privacy, handled by Match module later.
-
-    return { ...profile, photos };
-  }
 
   @Patch('basic-info')
   @ApiOperation({ summary: 'UC018: Cập nhật thông tin cơ bản (DOB, Gender)' })
@@ -173,5 +161,18 @@ export class ProfileController {
     @Body() dto: UpdatePassportDto,
   ) {
     return this.locationService.updatePassport(user.userId, dto);
+  }
+
+  @Get(':id')
+  @ApiOperation({
+    summary: 'UC017, UC021, UC025, UC032: Đọc Aggregated Profile (Other User)',
+  })
+  async getUserProfile(@Param('id') userId: string) {
+    const profile = await this.profileService.getProfile(userId, false);
+    const photos = await this.photoService.getGallery(userId);
+    // Usually we don't expose exact location to other users, maybe just distance.
+    // We'll omit location here for privacy, handled by Match module later.
+
+    return { ...profile, photos };
   }
 }

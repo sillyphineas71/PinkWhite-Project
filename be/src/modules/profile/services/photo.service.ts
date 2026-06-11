@@ -3,29 +3,27 @@ import {
   BadRequestException,
   Inject,
   forwardRef,
+  NotImplementedException,
 } from '@nestjs/common';
 import { PhotoRepository, PhotoEntity } from '../repositories/photo.repository';
 import { ConfirmPhotoUploadDto, ReorderPhotosDto } from '../dto/profile.dto';
 import { UserRepository } from '../../auth/repositories/user.repository';
+import { ProfileService } from './profile.service';
 
 @Injectable()
 export class PhotoService {
   constructor(
     private readonly photoRepo: PhotoRepository,
-    private readonly userRepo: UserRepository, // Need to set isOnboarded
+    private readonly profileService: ProfileService,
   ) {}
 
   async getPresignedUrl(userId: string): Promise<{ url: string }> {
     const count = await this.photoRepo.countByUserId(userId);
-    if (count >= 9) {
-      throw new BadRequestException('Đã đạt giới hạn tối đa 9 ảnh');
+    if (count >= 6) {
+      throw new BadRequestException('Đã đạt giới hạn tối đa 6 ảnh');
     }
 
-    // Mock S3 Pre-signed URL logic
-    const mockToken = Math.random().toString(36).substring(7);
-    return {
-      url: `https://mock-cloud.com/upload-link/${userId}-${mockToken}.jpg?expire=5m&maxSize=5MB`,
-    };
+    throw new NotImplementedException('S3 presigned URL generation not implemented in Phase 1');
   }
 
   async confirmUpload(
@@ -33,16 +31,14 @@ export class PhotoService {
     dto: ConfirmPhotoUploadDto,
   ): Promise<PhotoEntity> {
     const count = await this.photoRepo.countByUserId(userId);
-    if (count >= 9) {
-      throw new BadRequestException('Đã đạt giới hạn tối đa 9 ảnh');
+    if (count >= 6) {
+      throw new BadRequestException('Đã đạt giới hạn tối đa 6 ảnh');
     }
 
     const photo = await this.photoRepo.create(userId, dto.url, dto.isAvatar);
 
-    // If this is the first photo, complete onboarding
-    if (count === 0) {
-      await this.userRepo.setIsOnboarded(userId, true);
-    }
+    // Evaluate onboarding
+    await this.profileService.evaluateOnboarding(userId);
 
     return photo;
   }

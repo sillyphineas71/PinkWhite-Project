@@ -8,8 +8,6 @@ import { TokenService } from './services/token.service';
 import { EmailService } from './services/email.service';
 import { UserRepository } from './repositories/user.repository';
 import { SessionRepository } from './repositories/session.repository';
-import { VerificationTokenRepository } from './repositories/verification-token.repository';
-import { ResetPasswordTokenRepository } from './repositories/reset-password-token.repository';
 import { AuthIdentityRepository } from './repositories/auth-identity.repository';
 import { SecurityTokenRepository } from './repositories/security-token.repository';
 import { JwtAccessStrategy } from './strategies/jwt-access.strategy';
@@ -29,8 +27,6 @@ import { JwtAccessStrategy } from './strategies/jwt-access.strategy';
     // Repositories (Prisma-backed where migrated; legacy token repos kept for later batches)
     UserRepository,
     SessionRepository,
-    VerificationTokenRepository,
-    ResetPasswordTokenRepository,
     AuthIdentityRepository,
     SecurityTokenRepository,
     // Passport strategies
