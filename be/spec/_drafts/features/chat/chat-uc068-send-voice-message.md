@@ -1,7 +1,16 @@
+# CHANGELOG & REVISION HISTORY
+
+| Date | Change Summary | Sections Changed |
+|---|---|---|
+| 2026-06-11 | Marked as Out of Scope / Future | Header |
+
+---
+
 # UC068: Gửi tin nhắn Voice (Ghi âm)
 
-> **Revision**: v1 — Production-Grade
-> - Upload file audio đã ghi âm, gửi URL qua Socket.IO.
+> **Status**: Out of Scope (Phase 1)
+> **Revision**: Future Improvement / Out of Scope (Phase 1)
+> - **LƯU Ý:** Tính năng này KHÔNG nằm trong database baseline hiện tại và CHƯA được implement trong phase này.
 > - Giới hạn thời lượng ghi âm.
 
 ## 1. Context & Goal

@@ -1,6 +1,15 @@
+# CHANGELOG & REVISION HISTORY
+
+| Date | Change Summary | Sections Changed |
+|---|---|---|
+| 2026-06-11 | Add draft banner, update schema table names, replace Haversine with PostGIS | Header, Data Model, NFR, EARS |
+
+---
+
 # UC042: Lấy danh sách Feed (Discovery Feed)
 
-> **Revision**: v1 — Production-Grade
+> **Status**: Draft / Needs DB-baseline alignment before implementation.
+> **Revision**: v1 — Outdated DB Schema
 > - Thuật toán lọc dựa trên Preferences (Tuổi, Giới tính, Khoảng cách).
 > - Loại bỏ User đã quẹt, đã bị Block, đã Match.
 > - Phân trang Cursor-based.
@@ -18,10 +27,10 @@
 - Hiển thị quảng cáo trong Feed.
 
 ## 4. Data Model Impact
-- Đọc nhiều bảng: `User`, `Profile`, `Photo`, `Location`, `Preference`.
-- Đọc bảng `Swipe` (để loại trừ người đã quẹt).
-- Đọc bảng `Block` (để loại trừ người đã block/bị block).
-- Đọc bảng `Match` (để loại trừ người đã match).
+- Đọc nhiều bảng: `users`, `profiles`, `profile_photos`, `user_locations`, `discovery_preferences`.
+- Đọc bảng `swipe_events` / `swipe_states` (để loại trừ người đã quẹt).
+- Đọc bảng `user_blocks` (để loại trừ người đã block/bị block).
+- Đọc bảng `matches` (để loại trừ người đã match).
 - Không INSERT/UPDATE.
 
 ## 5. Non-functional Requirements (NFR)
@@ -56,10 +65,10 @@
     3. Query danh sách User phù hợp với điều kiện:
        - `gender` của Target khớp với `genderFilter` của User (IF `genderFilter = ALL` thì bỏ qua filter này).
        - `age` của Target nằm trong khoảng `[minAge, maxAge]`.
-       - Khoảng cách (Haversine) giữa User và Target ≤ `maxDistance` km.
-       - Target KHÔNG nằm trong bảng `Swipe` (User đã Like/Pass Target trước đó).
-       - Target KHÔNG nằm trong bảng `Block` (User đã block Target HOẶC Target đã block User).
-       - Target KHÔNG nằm trong bảng `Match` (đã match rồi thì không hiện lại).
+       - Khoảng cách (PostGIS ST_DWithin) giữa User và Target ≤ `maxDistance` km.
+       - Target KHÔNG nằm trong bảng `swipe_states` (User đã Like/Pass Target trước đó).
+       - Target KHÔNG nằm trong bảng `user_blocks` (User đã block Target HOẶC Target đã block User).
+       - Target KHÔNG nằm trong bảng `matches` (đã match rồi thì không hiện lại).
        - Target có `isOnboarded = true`, `isBanned = false`, `deletedAt = null`.
        - Target có `isHidden = false` (không ẩn danh — UC045).
        - Target PHẢI có ít nhất 1 Photo.

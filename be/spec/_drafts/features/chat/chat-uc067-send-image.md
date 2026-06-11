@@ -1,21 +1,30 @@
-# UC067: Gửi tin nhắn Hình ảnh / GIF
+# CHANGELOG & REVISION HISTORY
 
-> **Revision**: v1 — Production-Grade
-> - Upload ảnh/GIF lên Cloud Storage, gửi URL qua Socket.IO.
+| Date | Change Summary | Sections Changed |
+|---|---|---|
+| 2026-06-11 | Removed GIF, added draft banner | Header, Content |
+
+---
+
+# UC067: Gửi tin nhắn Hình ảnh
+
+> **Status**: Draft / Needs DB-baseline alignment before implementation.
+> **Revision**: v1 — Outdated DB Schema
+> - Upload ảnh lên Cloud Storage, gửi URL qua Socket.IO.
 > - Validate kích thước và định dạng file.
 
 ## 1. Context & Goal
-Ngoài tin nhắn text, người dùng cần có khả năng chia sẻ hình ảnh và GIF trong cuộc trò chuyện. Flow gồm 2 bước: (1) Upload file lên Cloud Storage (giống flow upload ảnh Profile — UC020), (2) Gửi tin nhắn dạng `IMAGE` hoặc `GIF` chứa URL của file. Mục tiêu là hỗ trợ giao tiếp đa phương tiện một cách mượt mà.
+Ngoài tin nhắn text, người dùng cần có khả năng chia sẻ hình ảnh trong cuộc trò chuyện. Flow gồm 2 bước: (1) Upload file lên Cloud Storage (giống flow upload ảnh Profile — UC020), (2) Gửi tin nhắn dạng `IMAGE` chứa URL của file. Mục tiêu là hỗ trợ giao tiếp đa phương tiện một cách mượt mà.
 
 ## 2. Actors & Roles
-- **Sender**: Người dùng gửi ảnh/GIF. Phải thuộc Match `ACTIVE`.
+- **Sender**: Người dùng gửi ảnh. Phải thuộc Match `ACTIVE`.
 
 ## 3. Out of Scope (Non-goals)
 - Xử lý video dài (clip).
 - Sticker packs (gói sticker tùy chỉnh).
 
 ## 4. Data Model Impact
-- Ghi vào bảng `Message` với `type = IMAGE` hoặc `type = GIF`, `content` chứa URL của file đã upload.
+- Ghi vào bảng `Message` với `type = IMAGE`, `content` chứa URL của file đã upload.
 - Cập nhật `Match.lastInteractionAt` và `unreadCount` (giống UC063).
 - INSERT + UPDATE.
 
@@ -31,8 +40,8 @@ Ngoài tin nhắn text, người dùng cần có khả năng chia sẻ hình ả
 - Không áp dụng.
 
 ### 5.3 Security & Privacy
-- Giới hạn dung lượng file: **tối đa 10MB** cho ảnh, **tối đa 5MB** cho GIF.
-- Chỉ chấp nhận định dạng: `image/jpeg`, `image/png`, `image/webp`, `image/gif`.
+- Giới hạn dung lượng file: **tối đa 10MB** cho ảnh.
+- Chỉ chấp nhận định dạng: `image/jpeg`, `image/png`, `image/webp`.
 - URL file phải là URL hợp lệ từ Cloud Storage đã xác thực (không chấp nhận URL bên ngoài).
 
 ### 5.4 Observability
@@ -44,7 +53,7 @@ Ngoài tin nhắn text, người dùng cần có khả năng chia sẻ hình ả
   - **Bước 1 (Upload)**: WHEN Sender gọi `POST /api/chat/:matchId/upload`, THE hệ thống SHALL:
     1. Validate định dạng và kích thước file.
     2. Trả về Presigned URL để Client upload trực tiếp lên Cloud Storage.
-  - **Bước 2 (Gửi message)**: WHEN Sender phát sự kiện Socket `chat:sendMessage` với payload `{ matchId, type: "IMAGE"|"GIF", content: "<fileUrl>" }`, THE hệ thống SHALL:
+  - **Bước 2 (Gửi message)**: WHEN Sender phát sự kiện Socket `chat:sendMessage` với payload `{ matchId, type: "IMAGE", content: "<fileUrl>" }`, THE hệ thống SHALL:
     1. Validate URL thuộc domain Cloud Storage hợp lệ.
     2. INSERT Message vào DB.
     3. Cập nhật Match (`lastInteractionAt`, `unreadCount`).

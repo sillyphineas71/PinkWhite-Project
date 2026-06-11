@@ -1,7 +1,16 @@
+# CHANGELOG & REVISION HISTORY
+
+| Date | Change Summary | Sections Changed |
+|---|---|---|
+| 2026-06-11 | Marked as Out of Scope / Future | Header |
+
+---
+
 # UC069: Thả cảm xúc vào tin nhắn (React)
 
-> **Revision**: v1 — Production-Grade
-> - Thêm/gỡ reaction emoji vào một tin nhắn cụ thể.
+> **Status**: Out of Scope (Phase 1)
+> **Revision**: Future Improvement / Out of Scope (Phase 1)
+> - **LƯU Ý:** Tính năng này KHÔNG nằm trong database baseline hiện tại và CHƯA được implement trong phase này.
 > - Realtime sync qua Socket.IO.
 
 ## 1. Context & Goal

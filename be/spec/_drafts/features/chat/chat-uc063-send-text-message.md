@@ -13,7 +13,7 @@
 - **Receiver**: Người nhận tin nhắn. Nếu đang online (kết nối Socket), nhận tin nhắn realtime. Nếu offline, tin nhắn được lưu DB và `unreadCount` tăng lên.
 
 ## 3. Out of Scope (Non-goals)
-- Gửi tin nhắn hình ảnh / GIF (UC067).
+- Gửi tin nhắn hình ảnh (UC067).
 - Gửi tin nhắn Voice (UC068).
 - End-to-End Encryption (E2EE) — chưa nằm trong scope giai đoạn này.
 
@@ -22,7 +22,7 @@
   - `id`: Bắt buộc sử dụng `clientMessageId` (UUID) từ phía Client gửi lên (tránh trùng lặp khi mạng rớt retry).
   - `matchId`: FK → Match.
   - `senderId`: FK → User.
-  - `type`: Enum (`TEXT`, `IMAGE`, `GIF`, `VOICE`).
+  - `type`: Enum (`TEXT`, `IMAGE`, `SYSTEM`).
   - `content`: String (nội dung text, tối đa 2000 ký tự).
   - `status`: Enum (`SENT`, `DELIVERED`, `READ`).
   - `isUnsent`: Boolean (mặc định `false`, `true` khi bị thu hồi — UC066).

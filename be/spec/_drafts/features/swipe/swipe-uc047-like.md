@@ -1,6 +1,15 @@
+# CHANGELOG & REVISION HISTORY
+
+| Date | Change Summary | Sections Changed |
+|---|---|---|
+| 2026-06-11 | Add draft banner and update schema table names | Header, Data Model |
+
+---
+
 # UC047: Quẹt phải (Like một người dùng)
 
-> **Revision**: v1 — Production-Grade
+> **Status**: Draft / Needs DB-baseline alignment before implementation.
+> **Revision**: v1 — Outdated DB Schema
 > - Hành động cốt lõi của app Dating: Thể hiện sự quan tâm đến một Profile.
 > - Trigger kiểm tra Match (UC056) ngay lập tức.
 > - Giới hạn lượt Like cho Free tier.
@@ -18,12 +27,12 @@ Khi User thấy một Profile phù hợp trong Feed, họ quẹt phải (hoặc 
 - Kích hoạt Match (UC056 xử lý — nhưng được gọi inline từ UC047).
 
 ## 4. Data Model Impact
-Tạo bản ghi mới trong bảng `Swipe`:
+Tạo bản ghi mới trong bảng `swipe_events` và `swipe_states`:
 ```prisma
-model Swipe {
-  id         String    @id @default(uuid())
-  swiperId   String
-  targetId   String
+model swipe_states {
+  id         String    @id @default(uuid()) @db.Uuid
+  user_id    String    @db.Uuid
+  target_id  String    @db.Uuid
   action     SwipeAction  // LIKE | PASS | SUPER_LIKE
   message    String?      // Chỉ dùng cho Super Like Platinum (UC051)
   createdAt  DateTime  @default(now())
