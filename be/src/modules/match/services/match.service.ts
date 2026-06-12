@@ -5,8 +5,10 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  NotImplementedException,
 } from '@nestjs/common';
-import { MatchRepository, MatchEntity } from '../repositories/match.repository';
+import { MatchReadRepository } from '../repositories/match-read.repository';
+import { MatchEntity } from '../match.types';
 import { UserRepository } from '../../auth/repositories/user.repository';
 import { ProfileRepository } from '../../profile/repositories/profile.repository';
 import { PhotoRepository } from '../../profile/repositories/photo.repository';
@@ -16,7 +18,7 @@ export class MatchService {
   private readonly logger = new Logger(MatchService.name);
 
   constructor(
-    private readonly matchRepo: MatchRepository,
+    private readonly matchRepo: MatchReadRepository,
     private readonly userRepo: UserRepository,
     private readonly profileRepo: ProfileRepository,
     private readonly photoRepo: PhotoRepository,
@@ -47,7 +49,8 @@ export class MatchService {
     // Clamp limit
     const safeLimit = Math.min(Math.max(limit, 1), 50);
 
-    const allActiveMatches = await this.matchRepo.findActiveMatchesByUserId(userId);
+    const allActiveMatches =
+      await this.matchRepo.findActiveMatchesByUserId(userId);
 
     // Ghost Data filtering: loại bỏ Match có đối phương bị Banned hoặc đã xóa tài khoản
     const filteredMatches: MatchEntity[] = [];
@@ -64,13 +67,16 @@ export class MatchService {
     // Cursor-based pagination
     let startIndex = 0;
     if (cursor) {
-      const cursorIndex = filteredMatches.findIndex(m => m.id === cursor);
+      const cursorIndex = filteredMatches.findIndex((m) => m.id === cursor);
       if (cursorIndex !== -1) {
         startIndex = cursorIndex + 1;
       }
     }
 
-    const paginatedMatches = filteredMatches.slice(startIndex, startIndex + safeLimit);
+    const paginatedMatches = filteredMatches.slice(
+      startIndex,
+      startIndex + safeLimit,
+    );
 
     // Build response
     const data = [];
@@ -79,7 +85,7 @@ export class MatchService {
       const partnerId = this.getPartnerId(match, side);
       const profile = await this.profileRepo.findByUserId(partnerId);
       const photos = await this.photoRepo.findByUserId(partnerId);
-      const avatar = photos.find(p => p.isAvatar);
+      const avatar = photos.find((p) => p.isAvatar);
 
       data.push({
         matchId: match.id,
@@ -97,11 +103,14 @@ export class MatchService {
     }
 
     const hasMore = startIndex + safeLimit < filteredMatches.length;
-    const nextCursor = paginatedMatches.length > 0
-      ? paginatedMatches[paginatedMatches.length - 1].id
-      : null;
+    const nextCursor =
+      paginatedMatches.length > 0
+        ? paginatedMatches[paginatedMatches.length - 1].id
+        : null;
 
-    this.logger.debug(`[GET_MATCH_LIST] userId=${userId}, resultCount=${data.length}`);
+    this.logger.debug(
+      `[GET_MATCH_LIST] userId=${userId}, resultCount=${data.length}`,
+    );
 
     return {
       data,
@@ -123,7 +132,9 @@ export class MatchService {
 
     const side = this.getUserSide(match, userId);
     if (!side) {
-      this.logger.warn(`[GET_MATCH_PROFILE] IDOR attempt: userId=${userId}, matchId=${matchId}`);
+      this.logger.warn(
+        `[GET_MATCH_PROFILE] IDOR attempt: userId=${userId}, matchId=${matchId}`,
+      );
       throw new ForbiddenException('Bạn không thuộc về lượt Match này');
     }
 
@@ -134,14 +145,20 @@ export class MatchService {
     // Ghost Data check
     const partnerId = this.getPartnerId(match, side);
     const partnerUser = await this.userRepo.findById(partnerId);
-    if (!partnerUser || partnerUser.isBanned || partnerUser.deletedAt !== null) {
+    if (
+      !partnerUser ||
+      partnerUser.isBanned ||
+      partnerUser.deletedAt !== null
+    ) {
       throw new GoneException('Tài khoản đối phương không còn khả dụng');
     }
 
     const profile = await this.profileRepo.findByUserId(partnerId);
     const photos = await this.photoRepo.findByUserId(partnerId);
 
-    this.logger.debug(`[GET_MATCH_PROFILE] userId=${userId}, targetId=${partnerId}, matchId=${matchId}`);
+    this.logger.debug(
+      `[GET_MATCH_PROFILE] userId=${userId}, targetId=${partnerId}, matchId=${matchId}`,
+    );
 
     return {
       userId: partnerId,
@@ -155,7 +172,7 @@ export class MatchService {
       company: profile?.company || null,
       jobTitle: profile?.jobTitle || null,
       school: profile?.school || null,
-      photos: photos.map(p => ({
+      photos: photos.map((p) => ({
         id: p.id,
         url: p.url,
         order: p.order,
@@ -170,8 +187,12 @@ export class MatchService {
    * - Chỉ tìm trong các Match ACTIVE.
    */
   async searchMatches(userId: string, keyword: string) {
-    const activeMatches = await this.matchRepo.findActiveMatchesByUserId(userId);
-    const lowerKeyword = keyword.toLowerCase();
+    // Trực tiếp query SQL từ Repo để lấy active matches có đối phương ILIKE keyword
+    const activeMatches = await this.matchRepo.searchActiveMatchesByPartnerName(
+      userId,
+      keyword,
+      50,
+    );
 
     const results = [];
     for (const match of activeMatches) {
@@ -180,14 +201,18 @@ export class MatchService {
 
       // Ghost Data filter
       const partnerUser = await this.userRepo.findById(partnerId);
-      if (!partnerUser || partnerUser.isBanned || partnerUser.deletedAt !== null) {
+      if (
+        !partnerUser ||
+        partnerUser.isBanned ||
+        partnerUser.deletedAt !== null
+      ) {
         continue;
       }
 
       const profile = await this.profileRepo.findByUserId(partnerId);
-      if (profile && profile.fullName.toLowerCase().includes(lowerKeyword)) {
+      if (profile) {
         const photos = await this.photoRepo.findByUserId(partnerId);
-        const avatar = photos.find(p => p.isAvatar);
+        const avatar = photos.find((p) => p.isAvatar);
 
         results.push({
           matchId: match.id,
@@ -205,7 +230,9 @@ export class MatchService {
       }
     }
 
-    this.logger.debug(`[SEARCH_MATCH] userId=${userId}, keyword="${keyword}", resultCount=${results.length}`);
+    this.logger.debug(
+      `[SEARCH_MATCH] userId=${userId}, keyword="${keyword}", resultCount=${results.length}`,
+    );
 
     return { data: results };
   }
@@ -230,82 +257,23 @@ export class MatchService {
       throw new BadRequestException('Lượt Match đã bị hủy trước đó');
     }
 
-    const newStatus = side === 'A' ? 'UNMATCHED_BY_A' : 'UNMATCHED_BY_B';
-    await this.matchRepo.updateStatus(matchId, newStatus);
+    const newStatus = 'UNMATCHED';
+    await this.matchRepo.updateStatus(matchId, newStatus, userId);
 
-    this.logger.debug(`[UNMATCH] userId=${userId}, matchId=${matchId}, newStatus=${newStatus}`);
+    this.logger.debug(
+      `[UNMATCH] userId=${userId}, matchId=${matchId}, newStatus=${newStatus}, unmatchedByUserId=${userId}`,
+    );
 
     return { success: true };
   }
 
   /**
    * UC061: Khôi phục Hủy Tương hợp (Rematch)
-   * - Chỉ Premium User.
-   * - Chỉ người đã chủ động Unmatch mới được Rematch.
-   * - Ghost Data check.
+   * DISABLED in Phase 4 Chat Persistence refactor.
    */
   async rematch(userId: string, matchId: string) {
-    const user = await this.userRepo.findById(userId);
-    if (!user || !user.isPremium) {
-      throw new ForbiddenException('Tính năng dành riêng cho Premium');
-    }
-
-    const match = await this.matchRepo.findById(matchId);
-    if (!match) {
-      throw new NotFoundException('Match không tồn tại');
-    }
-
-    const side = this.getUserSide(match, userId);
-    if (!side) {
-      throw new ForbiddenException('Bạn không thuộc về lượt Match này');
-    }
-
-    if (match.status === 'ACTIVE') {
-      throw new BadRequestException('Lượt Match này đang hoạt động, không cần Rematch');
-    }
-
-    // Kiểm tra quyền: chỉ người đã chủ động Unmatch mới được Rematch
-    const expectedStatus = side === 'A' ? 'UNMATCHED_BY_A' : 'UNMATCHED_BY_B';
-    if (match.status !== expectedStatus) {
-      throw new ForbiddenException('Bạn không có quyền khôi phục lượt Match này');
-    }
-
-    // Ghost Data check
-    const partnerId = this.getPartnerId(match, side);
-    const partnerUser = await this.userRepo.findById(partnerId);
-    if (!partnerUser || partnerUser.isBanned || partnerUser.deletedAt !== null) {
-      throw new GoneException('Tài khoản đối phương không còn khả dụng');
-    }
-
-    await this.matchRepo.updateStatus(matchId, 'ACTIVE');
-
-    this.logger.log(`[REMATCH] userId=${userId}, matchId=${matchId}`);
-
-    return { success: true };
-  }
-
-  /**
-   * UC062: Đánh dấu đã đọc
-   * - Reset unreadCount cho phía User đang gọi.
-   * - KHÔNG ảnh hưởng phía đối phương.
-   */
-  async markAsRead(userId: string, matchId: string) {
-    const match = await this.matchRepo.findById(matchId);
-    if (!match) {
-      throw new NotFoundException('Match không tồn tại');
-    }
-
-    const side = this.getUserSide(match, userId);
-    if (!side) {
-      throw new ForbiddenException('Bạn không thuộc về lượt Match này');
-    }
-
-    if (match.status !== 'ACTIVE') {
-      throw new ForbiddenException('Lượt Match này đã bị hủy');
-    }
-
-    await this.matchRepo.resetUnreadCount(matchId, side);
-
-    return { success: true };
+    throw new NotImplementedException(
+      'Tính năng Rematch đang bị vô hiệu hóa trong Phase hiện tại',
+    );
   }
 }
