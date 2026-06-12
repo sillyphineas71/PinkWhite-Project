@@ -3,7 +3,7 @@ import { ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { DiscoveryService } from '../services/discovery.service';
 import { CreatePreferenceDto } from '../dto/create-preference.dto';
 import { UpdatePreferenceDto } from '../dto/update-preference.dto';
-import { GetFeedQueryDto } from '../dto/get-feed-query.dto';
+import { GetDiscoveryFeedQueryDto } from '../dto/get-discovery-feed.dto';
 import { ToggleVisibilityDto } from '../dto/toggle-visibility.dto';
 import { JwtAccessGuard } from '../../auth/guards/jwt-access.guard';
 import { CurrentUser, AuthUser } from '../../auth/decorators/current-user.decorator';
@@ -47,7 +47,7 @@ export class DiscoveryController {
 
   @Get('feed')
   @ApiOperation({ summary: 'UC042: Lấy danh sách Feed (Người dùng tiềm năng)' })
-  async getFeed(@CurrentUser() user: AuthUser, @Query() query: GetFeedQueryDto) {
+  async getFeed(@CurrentUser() user: AuthUser, @Query() query: GetDiscoveryFeedQueryDto) {
     return this.discoveryService.getFeed(user.userId, query);
   }
 }
