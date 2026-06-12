@@ -2,6 +2,7 @@
 
 | Date | Change Summary | Sections Changed |
 |---|---|---|
+| 2026-06-13 | Update Match & Chat implementation status | GAP-01, GAP-10 |
 | 2026-06-11 | Initial known implementation gaps document | Toàn bộ file |
 
 ---
@@ -19,16 +20,7 @@ Mỗi gap có severity: 🔴 Critical / 🟡 Medium / 🟢 Low.
 **Severity:** 🔴 Critical
 
 **Vị trí:**
-- `src/modules/auth/repositories/user.repository.ts` — Dùng `Map<string, UserEntity>`
-- `src/modules/auth/repositories/session.repository.ts` — In-memory
-- `src/modules/auth/repositories/verification-token.repository.ts` — In-memory
-- `src/modules/auth/repositories/reset-password-token.repository.ts` — In-memory
-- `src/modules/profile/repositories/profile.repository.ts` — Dùng `Map<string, ProfileEntity>`
-- `src/modules/profile/repositories/location.repository.ts` — In-memory
-- `src/modules/profile/repositories/photo.repository.ts` — In-memory
 - `src/modules/swipe/repositories/` — In-memory
-- `src/modules/match/repositories/` — In-memory
-- `src/modules/discovery/repositories/` — In-memory
 
 **Impact:**
 - Data reset về rỗng mỗi khi server restart.
@@ -168,13 +160,14 @@ handleConnection(client: Socket) {
 
 ---
 
-## GAP-10: Chat Module Chưa Tồn Tại
+## GAP-10: Chat Module Realtime/Sockets Chưa Có
 
 **Severity:** 🔴 Critical
 
-**Chi tiết:** Không có `src/modules/chat/`. Chat là P0 feature nhưng chưa implement.
+**Chi tiết:** Module Chat đã có persistence (Lưu tin nhắn, lấy Inbox bằng Postgres), nhưng tính năng Realtime socket delivery + socket auth CHƯA được thực hiện. Outbox pattern cho push notification cũng CHƯA làm. Storage cho Image Message CHƯA hoàn thiện.
 
-**Impact:** Matched users không thể chat dù UI có thể tồn tại.
+**Impact:** User phải refresh page/kéo pull-to-refresh để lấy tin nhắn mới thay vì nhận được ngay qua socket. Không nhận được notification khi có tin nhắn mới.
+
 
 ---
 

@@ -34,10 +34,10 @@ Building a dating platform backend presents unique engineering challenges. This 
 | Feature | Status | Notes |
 |---------|--------|-------|
 | **Database Schema** | ✅ Completed | Fully migrated local DB with PostGIS |
-| **Auth & Security** | 🚧 In Progress | Mocked repositories, JWT integrated |
+| **Auth & Security** | ✅ Persistence Done | Postgres-backed auth and profile |
 | **Discovery & Swiping** | 🚧 Planned | Awaiting Prisma integration |
-| **Matching Engine** | 🚧 Planned | Mutual like detection & outbox events |
-| **Realtime Chat** | 🚧 Planned | Text + Image support via Socket.IO |
+| **Matching Engine** | ✅ Persistence Done | Postgres-backed match creation |
+| **Realtime Chat** | 🚧 Persistence Done | Postgres-backed messaging, NO realtime sockets yet |
 | **Payments/Monetization**| ⏳ Planned | VNPAY prepaid schema ready |
 
 *Note: Features like video/voice calls, live streaming, and recurring billing via Stripe/Apple IAP are explicitly out of scope for Phase 1.*

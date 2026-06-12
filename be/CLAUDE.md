@@ -4,6 +4,7 @@
 
 | Date | Change Summary | Sections Changed |
 |---|---|---|
+| 2026-06-13 | Update implementation state for Match & Chat (Phase 4 complete) | KNOWN IMPLEMENTATION STATE |
 | 2026-06-11 | Full rewrite — production-grade backend agent guide cho dating/social matchmaking platform | Toàn bộ file |
 
 ---
@@ -349,24 +350,24 @@ Một backend feature được coi là "Done" khi:
 
 ---
 
-## KNOWN IMPLEMENTATION STATE (as of 2026-06-11)
+## KNOWN IMPLEMENTATION STATE (as of 2026-06-13)
 
 | Item | State | Note |
 |---|---|---|
 | Prisma schema | **Ready (21 models)** | Đã apply thành công PostgreSQL + PostGIS migration ở local |
-| User repository | In-memory mock | Dùng `Map<string, UserEntity>` (Chờ refactor sang Prisma) |
-| Profile repository | In-memory mock | Dùng `Map<string, ProfileEntity>` (Chờ refactor sang Prisma) |
+| User repository | Postgres-backed | Đã refactor sang Prisma |
+| Profile repository | Postgres-backed | Đã refactor sang Prisma |
 | Swipe repository | In-memory mock | (Chờ refactor sang Prisma) |
-| Match repository | In-memory mock | (Chờ refactor sang Prisma) |
-| Discovery repository | In-memory mock | (Chờ refactor sang Prisma) |
+| Match repository | Postgres-backed | Đã refactor sang Prisma |
+| Discovery repository | Postgres-backed | Đã refactor sang Prisma |
 | Realtime gateway | Placeholder | Chỉ có ping/pong, không có auth |
 | Notification service | Placeholder | In-app only trong tương lai |
 | Storage | Không có | Chưa implement |
-| Chat module | Không có | Chưa implement (text + image only) |
+| Chat module | Persistence Done | Lưu tin nhắn/inbox qua Postgres, CHƯA có Realtime Sockets / Image Storage |
 | Safety module | Không có | Chưa implement |
 | CSRF protection | Không rõ | Cần review |
 | Account status guard | Không rõ | JwtAccessGuard chưa check account status |
-| `.env.example` | CÓ SECRET THẬT | SMTP_PASSWORD và GOOGLE_CLIENT_ID chứa giá trị thật |
+| `.env.example` | Đã sanitize | Các credentials đã được xóa/thay bằng placeholder |
 
 Chi tiết: `spec/global/known-gaps.md`
 
