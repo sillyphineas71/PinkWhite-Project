@@ -22,7 +22,10 @@ export class SwipeService {
     private readonly matchCreationService: MatchCreationService,
   ) {}
 
-  async processSwipe(requesterId: string, dto: CreateSwipeDto): Promise<SwipeResponseDto> {
+  async processSwipe(
+    requesterId: string,
+    dto: CreateSwipeDto,
+  ): Promise<SwipeResponseDto> {
     const { targetUserId, action } = dto;
 
     const allowedActions = ['PASS', 'LIKE', 'SUPER_LIKE'];
@@ -37,7 +40,10 @@ export class SwipeService {
 
     return this.prisma.$transaction(async (tx: TxClient) => {
       // 2. Validate requester eligibility.
-      const requester = await this.swipeReadRepo.findRequesterEligibility(tx, requesterId);
+      const requester = await this.swipeReadRepo.findRequesterEligibility(
+        tx,
+        requesterId,
+      );
       if (
         !requester ||
         requester.accountStatus !== 'ACTIVE' ||
@@ -53,13 +59,19 @@ export class SwipeService {
         throw new SwipeException(SwipeErrorCode.SWIPE_NOT_ALLOWED);
       }
 
-      const hasRealLocation = await this.swipeReadRepo.hasActiveRealLocation(tx, requesterId);
+      const hasRealLocation = await this.swipeReadRepo.hasActiveRealLocation(
+        tx,
+        requesterId,
+      );
       if (!hasRealLocation) {
         throw new SwipeException(SwipeErrorCode.SWIPE_NOT_ALLOWED);
       }
 
       // 3. Validate target eligibility.
-      const target = await this.swipeReadRepo.findTargetEligibility(tx, targetUserId);
+      const target = await this.swipeReadRepo.findTargetEligibility(
+        tx,
+        targetUserId,
+      );
       if (
         !target ||
         target.accountStatus !== 'ACTIVE' ||
@@ -81,16 +93,28 @@ export class SwipeService {
       }
 
       // 4. Check block either direction.
-      const isBlocked = await this.swipeReadRepo.findBlockEitherDirection(tx, requesterId, targetUserId);
+      const isBlocked = await this.swipeReadRepo.findBlockEitherDirection(
+        tx,
+        requesterId,
+        targetUserId,
+      );
       if (isBlocked) {
         throw new SwipeException(SwipeErrorCode.TARGET_NOT_AVAILABLE);
       }
 
       // 4.5 Acquire pair-level lock to prevent concurrent match creation race conditions.
-      await this.matchWriteRepo.acquirePairTransactionLock(tx, requesterId, targetUserId);
+      await this.matchWriteRepo.acquirePairTransactionLock(
+        tx,
+        requesterId,
+        targetUserId,
+      );
 
       // 5. Check any existing match record.
-      const existingMatch = await this.matchWriteRepo.findMatchByPair(tx, requesterId, targetUserId);
+      const existingMatch = await this.matchWriteRepo.findMatchByPair(
+        tx,
+        requesterId,
+        targetUserId,
+      );
       if (existingMatch) {
         if (existingMatch.status === 'ACTIVE') {
           throw new SwipeException(SwipeErrorCode.ALREADY_MATCHED);
@@ -100,24 +124,41 @@ export class SwipeService {
       }
 
       // 7. Check current swipe_state requester -> target.
-      const currentState = await this.swipeReadRepo.findCurrentSwipeState(tx, requesterId, targetUserId);
+      const currentState = await this.swipeReadRepo.findCurrentSwipeState(
+        tx,
+        requesterId,
+        targetUserId,
+      );
 
       // 8. If currentAction equals requested action (Idempotent success)
       // Note: cast currentState.currentAction because Prisma defines CurrentSwipeAction for state but SwipeAction for events
-      if (currentState && currentState.currentAction as string === action) {
+      if (currentState && (currentState.currentAction as string) === action) {
         return {
           targetUserId,
           action,
           matched: false,
-          matchId: null
+          matchId: null,
         };
       }
 
       // 9. If currentAction differs or no state exists
       const now = new Date();
       const actionForPrisma = action as any;
-      const event = await this.swipeWriteRepo.createSwipeEvent(tx, requesterId, targetUserId, actionForPrisma, now);
-      await this.swipeWriteRepo.upsertSwipeState(tx, requesterId, targetUserId, actionForPrisma, event.id, now);
+      const event = await this.swipeWriteRepo.createSwipeEvent(
+        tx,
+        requesterId,
+        targetUserId,
+        actionForPrisma,
+        now,
+      );
+      await this.swipeWriteRepo.upsertSwipeState(
+        tx,
+        requesterId,
+        targetUserId,
+        actionForPrisma,
+        event.id,
+        now,
+      );
 
       // 10. If action is PASS
       if (action === 'PASS') {
@@ -125,20 +166,25 @@ export class SwipeService {
           targetUserId,
           action,
           matched: false,
-          matchId: null
+          matchId: null,
         };
       }
 
       // 11. If action is LIKE/SUPER_LIKE: check reciprocal positive state target -> requester
-      const reciprocalState = await this.swipeReadRepo.findReciprocalPositiveState(tx, requesterId, targetUserId);
-      
+      const reciprocalState =
+        await this.swipeReadRepo.findReciprocalPositiveState(
+          tx,
+          requesterId,
+          targetUserId,
+        );
+
       // 12. If no reciprocal positive
       if (!reciprocalState) {
         return {
           targetUserId,
           action,
           matched: false,
-          matchId: null
+          matchId: null,
         };
       }
 
@@ -154,10 +200,13 @@ export class SwipeService {
           targetUserId,
           action,
           matched: true,
-          matchId: match.id
+          matchId: match.id,
         };
       } catch (error: any) {
-        if (error instanceof MatchException && error.code === MatchErrorCode.TARGET_NOT_AVAILABLE) {
+        if (
+          error instanceof MatchException &&
+          error.code === MatchErrorCode.TARGET_NOT_AVAILABLE
+        ) {
           throw new SwipeException(SwipeErrorCode.TARGET_NOT_AVAILABLE);
         }
         throw error;

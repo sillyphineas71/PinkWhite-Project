@@ -77,11 +77,16 @@ export class AuthIdentityRepository {
       data: { passwordHash },
     });
     if (result.count === 0) {
-      this.logger.warn(`No identity found for user ${userId} / provider ${provider}`);
+      this.logger.warn(
+        `No identity found for user ${userId} / provider ${provider}`,
+      );
     }
   }
 
-  async deleteByUserId(userId: string, tx?: Prisma.TransactionClient): Promise<void> {
+  async deleteByUserId(
+    userId: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<void> {
     const client = this.client(tx);
     await client.authIdentity.deleteMany({
       where: { userId },

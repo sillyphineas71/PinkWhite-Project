@@ -81,7 +81,11 @@ export class UserRepository {
     return user ? this.toEntityFull(user) : null;
   }
 
-  async updatePasswordHash(id: string, passwordHash: string | null, tx?: Prisma.TransactionClient): Promise<void> {
+  async updatePasswordHash(
+    id: string,
+    passwordHash: string | null,
+    tx?: Prisma.TransactionClient,
+  ): Promise<void> {
     const client = this.client(tx);
     const identity = await client.authIdentity.findFirst({
       where: { userId: id, provider: 'EMAIL' },
@@ -94,7 +98,10 @@ export class UserRepository {
     }
   }
 
-  async setEmailVerified(email: string, tx?: Prisma.TransactionClient): Promise<void> {
+  async setEmailVerified(
+    email: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<void> {
     const client = this.client(tx);
     const emailNormalized = email.toLowerCase().trim();
     await client.user.update({
@@ -124,12 +131,18 @@ export class UserRepository {
       data: {
         deletedAt: null,
         deletionScheduledAt: null,
-        accountStatus: user.emailVerifiedAt ? 'ACTIVE' : 'PENDING_EMAIL_VERIFICATION',
+        accountStatus: user.emailVerifiedAt
+          ? 'ACTIVE'
+          : 'PENDING_EMAIL_VERIFICATION',
       },
     });
   }
 
-  async setIsOnboarded(id: string, value: boolean, tx?: Prisma.TransactionClient): Promise<void> {
+  async setIsOnboarded(
+    id: string,
+    value: boolean,
+    tx?: Prisma.TransactionClient,
+  ): Promise<void> {
     const client = this.client(tx);
     await client.user.update({
       where: { id },
@@ -140,7 +153,11 @@ export class UserRepository {
     });
   }
 
-  async setIsHidden(id: string, value: boolean, tx?: Prisma.TransactionClient): Promise<void> {
+  async setIsHidden(
+    id: string,
+    value: boolean,
+    tx?: Prisma.TransactionClient,
+  ): Promise<void> {
     const client = this.client(tx);
     await client.userPrivacySettings.upsert({
       where: { userId: id },
@@ -164,7 +181,20 @@ export class UserRepository {
 
   // ---- Mapping helpers ----
 
-  private toEntity(user: { id: string; email: string; emailVerifiedAt: Date | null; accountStatus: string; onboardingStatus: string; deletedAt: Date | null; deletionScheduledAt: Date | null; createdAt: Date; updatedAt: Date }, passwordHash: string | null): UserEntity {
+  private toEntity(
+    user: {
+      id: string;
+      email: string;
+      emailVerifiedAt: Date | null;
+      accountStatus: string;
+      onboardingStatus: string;
+      deletedAt: Date | null;
+      deletionScheduledAt: Date | null;
+      createdAt: Date;
+      updatedAt: Date;
+    },
+    passwordHash: string | null,
+  ): UserEntity {
     return {
       id: user.id,
       email: user.email,
@@ -182,7 +212,18 @@ export class UserRepository {
     };
   }
 
-  private toEntityFull(user: { id: string; email: string; emailVerifiedAt: Date | null; accountStatus: string; onboardingStatus: string; deletedAt: Date | null; deletionScheduledAt: Date | null; createdAt: Date; updatedAt: Date; authIdentities: Array<{ passwordHash: string | null }> }): UserEntity {
+  private toEntityFull(user: {
+    id: string;
+    email: string;
+    emailVerifiedAt: Date | null;
+    accountStatus: string;
+    onboardingStatus: string;
+    deletedAt: Date | null;
+    deletionScheduledAt: Date | null;
+    createdAt: Date;
+    updatedAt: Date;
+    authIdentities: Array<{ passwordHash: string | null }>;
+  }): UserEntity {
     const emailIdentity = user.authIdentities?.[0];
     return {
       id: user.id,

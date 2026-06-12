@@ -1,4 +1,13 @@
-import { Body, Controller, Get, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Patch,
+  Post,
+  Query,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { DiscoveryService } from '../services/discovery.service';
 import { CreatePreferenceDto } from '../dto/create-preference.dto';
@@ -6,7 +15,10 @@ import { UpdatePreferenceDto } from '../dto/update-preference.dto';
 import { GetDiscoveryFeedQueryDto } from '../dto/get-discovery-feed.dto';
 import { ToggleVisibilityDto } from '../dto/toggle-visibility.dto';
 import { JwtAccessGuard } from '../../auth/guards/jwt-access.guard';
-import { CurrentUser, AuthUser } from '../../auth/decorators/current-user.decorator';
+import {
+  CurrentUser,
+  AuthUser,
+} from '../../auth/decorators/current-user.decorator';
 
 @ApiTags('Discovery')
 @ApiCookieAuth()
@@ -17,7 +29,10 @@ export class DiscoveryController {
 
   @Post('preferences')
   @ApiOperation({ summary: 'UC039: Tạo mới Preferences' })
-  async createPreferences(@CurrentUser() user: AuthUser, @Body() dto: CreatePreferenceDto) {
+  async createPreferences(
+    @CurrentUser() user: AuthUser,
+    @Body() dto: CreatePreferenceDto,
+  ) {
     return this.discoveryService.createPreferences(user.userId, dto);
   }
 
@@ -29,13 +44,19 @@ export class DiscoveryController {
 
   @Patch('preferences')
   @ApiOperation({ summary: 'UC041: Cập nhật Preferences' })
-  async updatePreferences(@CurrentUser() user: AuthUser, @Body() dto: UpdatePreferenceDto) {
+  async updatePreferences(
+    @CurrentUser() user: AuthUser,
+    @Body() dto: UpdatePreferenceDto,
+  ) {
     return this.discoveryService.updatePreferences(user.userId, dto);
   }
 
   @Post('visibility/toggle')
   @ApiOperation({ summary: 'UC045: Bật/Tắt chế độ ẩn danh (Premium only)' })
-  async toggleVisibility(@CurrentUser() user: AuthUser, @Body() dto: ToggleVisibilityDto) {
+  async toggleVisibility(
+    @CurrentUser() user: AuthUser,
+    @Body() dto: ToggleVisibilityDto,
+  ) {
     return this.discoveryService.toggleVisibility(user.userId, dto.isHidden);
   }
 
@@ -47,7 +68,10 @@ export class DiscoveryController {
 
   @Get('feed')
   @ApiOperation({ summary: 'UC042: Lấy danh sách Feed (Người dùng tiềm năng)' })
-  async getFeed(@CurrentUser() user: AuthUser, @Query() query: GetDiscoveryFeedQueryDto) {
+  async getFeed(
+    @CurrentUser() user: AuthUser,
+    @Query() query: GetDiscoveryFeedQueryDto,
+  ) {
     return this.discoveryService.getFeed(user.userId, query);
   }
 }

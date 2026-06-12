@@ -43,7 +43,7 @@ export class LocationRepository {
         real_location = ST_SetSRID(ST_MakePoint(${longitude}, ${latitude}), 4326)::geography(Point,4326),
         updated_at = NOW();
     `;
-    
+
     this.logger.debug(`Location UPSERT for userId: ${userId}`);
     const result = await this.findByUserId(userId);
     return result!;
@@ -54,7 +54,9 @@ export class LocationRepository {
     passportLat: number,
     passportLng: number,
   ): Promise<LocationEntity> {
-    throw new NotImplementedException('Passport location not implemented in Phase 1');
+    throw new NotImplementedException(
+      'Passport location not implemented in Phase 1',
+    );
   }
 
   async findByUserId(userId: string): Promise<LocationEntity | null> {

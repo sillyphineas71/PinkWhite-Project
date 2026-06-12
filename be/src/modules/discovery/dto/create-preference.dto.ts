@@ -22,11 +22,18 @@ export class CreatePreferenceDto {
   @Max(100)
   maxAge: number;
 
-  @ApiProperty({ description: 'Lọc theo giới tính', enum: GenderFilter, example: GenderFilter.FEMALE })
+  @ApiProperty({
+    description: 'Lọc theo giới tính',
+    enum: GenderFilter,
+    example: GenderFilter.FEMALE,
+  })
   @IsEnum(GenderFilter)
   genderFilter: GenderFilter;
 
-  @ApiProperty({ description: 'Khoảng cách tối đa (km). Gói Free tối đa 200km.', example: 50 })
+  @ApiProperty({
+    description: 'Khoảng cách tối đa (km). Gói Free tối đa 200km.',
+    example: 50,
+  })
   @IsInt()
   @Min(1)
   maxDistance: number;

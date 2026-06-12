@@ -17,11 +17,17 @@ import { SwipeRepository } from '../../swipe/repositories/swipe.repository';
 import { UserPrivacySettingsRepository } from '../../profile/repositories/user-privacy-settings.repository';
 import { DiscoveryFeedRepository } from '../repositories/discovery-feed.repository';
 import { PrismaService } from '../../../database/prisma.service';
-import { decodeDiscoveryCursor, encodeDiscoveryCursor } from '../utils/discovery-cursor.util';
-import { DiscoveryFeedResponseDto, DiscoveryCandidateDto, DiscoveryCandidatePhotoDto } from '../dto/discovery-feed-response.dto';
+import {
+  decodeDiscoveryCursor,
+  encodeDiscoveryCursor,
+} from '../utils/discovery-cursor.util';
+import {
+  DiscoveryFeedResponseDto,
+  DiscoveryCandidateDto,
+  DiscoveryCandidatePhotoDto,
+} from '../dto/discovery-feed-response.dto';
 import { calculateHaversineDistance } from '../utils/geo.util';
 import { NotImplementedException } from '@nestjs/common';
-
 
 @Injectable()
 export class DiscoveryService {
@@ -159,14 +165,27 @@ export class DiscoveryService {
       WHERE user_id = ${userId}::uuid
     `;
     const location = locationRows[0];
-    if (!location || location.active_location_mode !== 'real' || location.lng === null || location.lat === null) {
+    if (
+      !location ||
+      location.active_location_mode !== 'real' ||
+      location.lng === null ||
+      location.lat === null
+    ) {
       throw new BadRequestException('LOCATION_REQUIRED');
     }
 
-    return { user, settings, prefs, location: { latitude: location.lat, longitude: location.lng } };
+    return {
+      user,
+      settings,
+      prefs,
+      location: { latitude: location.lat, longitude: location.lng },
+    };
   }
 
-  async getFeed(userId: string, query: GetDiscoveryFeedQueryDto): Promise<DiscoveryFeedResponseDto> {
+  async getFeed(
+    userId: string,
+    query: GetDiscoveryFeedQueryDto,
+  ): Promise<DiscoveryFeedResponseDto> {
     const limit = query.limit || 20;
     const decodedCursor = decodeDiscoveryCursor(query.cursor);
 
@@ -174,8 +193,8 @@ export class DiscoveryService {
     const { location, prefs } = readiness;
 
     const rawGenders = (prefs.preferredGenders as string[]) || [];
-    let preferredGenders = rawGenders.map(g => g.toLowerCase());
-    
+    let preferredGenders = rawGenders.map((g) => g.toLowerCase());
+
     if (preferredGenders.includes('all')) {
       preferredGenders = ['male', 'female', 'non_binary', 'other'];
     }
@@ -203,7 +222,7 @@ export class DiscoveryService {
       };
     }
 
-    const candidateUserIds = visibleRows.map(r => r.candidateUserId);
+    const candidateUserIds = visibleRows.map((r) => r.candidateUserId);
 
     const profiles = await this.prisma.profile.findMany({
       where: { userId: { in: candidateUserIds } },
@@ -234,9 +253,11 @@ export class DiscoveryService {
       },
     });
 
-    const profileMap = new Map<string, any>(profiles.map((p: any) => [p.userId, p]));
+    const profileMap = new Map<string, any>(
+      profiles.map((p: any) => [p.userId, p]),
+    );
     const photoMap = new Map<string, DiscoveryCandidatePhotoDto[]>();
-    
+
     for (const photo of photos) {
       if (!photo.publicUrl || photo.publicUrl.trim() === '') continue;
       const p = photoMap.get(photo.userId) || [];
@@ -257,7 +278,8 @@ export class DiscoveryService {
       let age = new Date().getFullYear() - profile.dob.getFullYear();
       const hasHadBirthdayThisYear =
         new Date().getMonth() > profile.dob.getMonth() ||
-        (new Date().getMonth() === profile.dob.getMonth() && new Date().getDate() >= profile.dob.getDate());
+        (new Date().getMonth() === profile.dob.getMonth() &&
+          new Date().getDate() >= profile.dob.getDate());
       if (!hasHadBirthdayThisYear) {
         age -= 1;
       }
@@ -285,7 +307,10 @@ export class DiscoveryService {
     let nextCursor: string | null = null;
     if (hasMore && visibleRows.length > 0) {
       const lastRow = visibleRows[visibleRows.length - 1];
-      nextCursor = encodeDiscoveryCursor(lastRow.distanceMeters, lastRow.candidateUserId);
+      nextCursor = encodeDiscoveryCursor(
+        lastRow.distanceMeters,
+        lastRow.candidateUserId,
+      );
     }
 
     return {

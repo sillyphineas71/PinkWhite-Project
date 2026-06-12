@@ -151,10 +151,7 @@ export class ProfileService {
       dataToUpdate.genderUpdatedAt = now;
     }
 
-    const updated = await this.profileRepo.update(
-      userId,
-      dataToUpdate,
-    );
+    const updated = await this.profileRepo.update(userId, dataToUpdate);
     if (!updated) {
       throw new BadRequestException('Profile not found');
     }
@@ -176,10 +173,7 @@ export class ProfileService {
     if (dto.bio !== undefined) dataToUpdate.bio = dto.bio;
     if (dto.interestIds !== undefined) dataToUpdate.interests = dto.interestIds; // MOCK ONLY - normally M:M relational insert
 
-    const updated = await this.profileRepo.update(
-      userId,
-      dataToUpdate,
-    );
+    const updated = await this.profileRepo.update(userId, dataToUpdate);
     if (!updated) {
       throw new BadRequestException('Profile not found');
     }
@@ -203,10 +197,7 @@ export class ProfileService {
     if (dto.jobTitle !== undefined) dataToUpdate.jobTitle = dto.jobTitle.trim();
     if (dto.school !== undefined) dataToUpdate.school = dto.school.trim();
 
-    const updated = await this.profileRepo.update(
-      userId,
-      dataToUpdate,
-    );
+    const updated = await this.profileRepo.update(userId, dataToUpdate);
     if (!updated) {
       throw new BadRequestException('Profile not found');
     }
@@ -265,7 +256,9 @@ export class ProfileService {
     if (location.activeLocationMode !== 'REAL') return;
 
     // 9. real_location is not null (we can't easily fetch PostGIS geography via include without raw query, so we check if it exists via raw query)
-    const locRows = await this.prisma.$queryRaw<any[]>`SELECT real_location FROM user_locations WHERE user_id = ${userId}::uuid AND real_location IS NOT NULL`;
+    const locRows = await this.prisma.$queryRaw<
+      any[]
+    >`SELECT real_location FROM user_locations WHERE user_id = ${userId}::uuid AND real_location IS NOT NULL`;
     if (!locRows || locRows.length === 0) return;
 
     // 10. at least one profile photo exists that is: not deleted, CONFIRMED, APPROVED

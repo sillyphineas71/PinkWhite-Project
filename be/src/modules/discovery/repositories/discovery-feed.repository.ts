@@ -145,7 +145,7 @@ export class DiscoveryFeedRepository {
       LIMIT ${limitPlusOne};
     `;
 
-    return rows.map((r) => ({
+    return rows.map((r: any) => ({
       candidateUserId: r.candidateUserId,
       distanceMeters: Number(r.distanceMeters),
     }));

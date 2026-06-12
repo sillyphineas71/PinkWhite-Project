@@ -5,15 +5,21 @@ export interface DiscoveryCursorPayload {
   candidateUserId: string;
 }
 
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export function encodeDiscoveryCursor(distanceMeters: number, candidateUserId: string): string {
+export function encodeDiscoveryCursor(
+  distanceMeters: number,
+  candidateUserId: string,
+): string {
   const payload: DiscoveryCursorPayload = { distanceMeters, candidateUserId };
   const jsonStr = JSON.stringify(payload);
   return Buffer.from(jsonStr, 'utf-8').toString('base64');
 }
 
-export function decodeDiscoveryCursor(cursor?: string): DiscoveryCursorPayload | null {
+export function decodeDiscoveryCursor(
+  cursor?: string,
+): DiscoveryCursorPayload | null {
   if (!cursor) {
     return null;
   }

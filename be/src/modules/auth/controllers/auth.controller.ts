@@ -60,11 +60,7 @@ export class AuthController {
     @CurrentUser() user: AuthUser,
     @Res({ passthrough: true }) res: express.Response,
   ) {
-    return this.authService.logout(
-      user.userId,
-      user.sessionId,
-      res,
-    );
+    return this.authService.logout(user.userId, user.sessionId, res);
   }
 
   // UC004: Get /me

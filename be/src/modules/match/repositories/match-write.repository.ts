@@ -12,7 +12,11 @@ export class MatchWriteRepository {
     };
   }
 
-  async acquirePairTransactionLock(tx: TxClient, userId1: string, userId2: string) {
+  async acquirePairTransactionLock(
+    tx: TxClient,
+    userId1: string,
+    userId2: string,
+  ) {
     const { userAId, userBId } = this.normalizePair(userId1, userId2);
     const pairKey = `${userAId}:${userBId}`;
     await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${pairKey}, 0))`;
@@ -24,34 +28,41 @@ export class MatchWriteRepository {
       where: {
         userAId_userBId: {
           userAId,
-          userBId
-        }
-      }
+          userBId,
+        },
+      },
     });
   }
 
-  async createActiveMatchSafe(tx: TxClient, userId1: string, userId2: string, now: Date) {
+  async createActiveMatchSafe(
+    tx: TxClient,
+    userId1: string,
+    userId2: string,
+    now: Date,
+  ) {
     const { userAId, userBId } = this.normalizePair(userId1, userId2);
-    
+
     await tx.match.createMany({
-      data: [{
-        userAId,
-        userBId,
-        status: 'ACTIVE',
-        matchedAt: now,
-        createdAt: now,
-        updatedAt: now
-      }],
-      skipDuplicates: true
+      data: [
+        {
+          userAId,
+          userBId,
+          status: 'ACTIVE',
+          matchedAt: now,
+          createdAt: now,
+          updatedAt: now,
+        },
+      ],
+      skipDuplicates: true,
     });
 
     return tx.match.findUnique({
       where: {
         userAId_userBId: {
           userAId,
-          userBId
-        }
-      }
+          userBId,
+        },
+      },
     });
   }
 }

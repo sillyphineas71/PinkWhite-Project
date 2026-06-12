@@ -4,7 +4,7 @@ import request from 'supertest';
 import { AppModule } from './../src/app.module';
 import { UserRepository } from './../src/modules/auth/repositories/user.repository';
 import cookieParser from 'cookie-parser';
-import { MatchRepository } from '../src/modules/match/repositories/match.repository';
+import { PrismaService } from '../src/database/prisma.service';
 
 describe('SwipeModule (e2e)', () => {
   let app: INestApplication;
@@ -13,7 +13,7 @@ describe('SwipeModule (e2e)', () => {
   let userIdA: string;
   let userIdB: string;
   let userRepo: UserRepository;
-  let matchRepo: MatchRepository;
+  let prisma: PrismaService;
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -22,30 +22,50 @@ describe('SwipeModule (e2e)', () => {
 
     app = moduleFixture.createNestApplication();
     app.use(cookieParser());
-    app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+    app.useGlobalPipes(
+      new ValidationPipe({ whitelist: true, transform: true }),
+    );
     await app.init();
 
     userRepo = app.get(UserRepository);
-    matchRepo = app.get(MatchRepository);
+    prisma = app.get(PrismaService);
 
     // Setup User A
     const emailA = `testa-${Date.now()}@example.com`;
     const password = 'StrongPassword123!@#';
-    await request(app.getHttpServer()).post('/auth/register').send({ email: emailA, password });
+    await request(app.getHttpServer())
+      .post('/auth/register')
+      .send({ email: emailA, password });
     await userRepo.setEmailVerified(emailA);
-    const loginResA = await request(app.getHttpServer()).post('/auth/login').send({ email: emailA, password });
-    const cookieA = ((loginResA.headers['set-cookie'] as unknown) as string[]) || [];
-    accessTokenA = cookieA.find(c => c.startsWith('access_token='))?.split(';')[0].split('=')[1] || '';
+    const loginResA = await request(app.getHttpServer())
+      .post('/auth/login')
+      .send({ email: emailA, password });
+    const cookieA =
+      (loginResA.headers['set-cookie'] as unknown as string[]) || [];
+    accessTokenA =
+      cookieA
+        .find((c) => c.startsWith('access_token='))
+        ?.split(';')[0]
+        .split('=')[1] || '';
     const userA = await userRepo.findByEmail(emailA);
     userIdA = userA!.id;
 
     // Setup User B
     const emailB = `testb-${Date.now()}@example.com`;
-    await request(app.getHttpServer()).post('/auth/register').send({ email: emailB, password });
+    await request(app.getHttpServer())
+      .post('/auth/register')
+      .send({ email: emailB, password });
     await userRepo.setEmailVerified(emailB);
-    const loginResB = await request(app.getHttpServer()).post('/auth/login').send({ email: emailB, password });
-    const cookieB = ((loginResB.headers['set-cookie'] as unknown) as string[]) || [];
-    accessTokenB = cookieB.find(c => c.startsWith('access_token='))?.split(';')[0].split('=')[1] || '';
+    const loginResB = await request(app.getHttpServer())
+      .post('/auth/login')
+      .send({ email: emailB, password });
+    const cookieB =
+      (loginResB.headers['set-cookie'] as unknown as string[]) || [];
+    accessTokenB =
+      cookieB
+        .find((c) => c.startsWith('access_token='))
+        ?.split(';')[0]
+        .split('=')[1] || '';
     const userB = await userRepo.findByEmail(emailB);
     userIdB = userB!.id;
 
@@ -61,14 +81,20 @@ describe('SwipeModule (e2e)', () => {
   });
 
   const getAuthReqA = (method: 'get' | 'post', url: string) => {
-    return request(app.getHttpServer())[method](url).set('Cookie', [`access_token=${accessTokenA}`]);
+    return request(app.getHttpServer())
+      [method](url)
+      .set('Cookie', [`access_token=${accessTokenA}`]);
   };
   const getAuthReqB = (method: 'get' | 'post', url: string) => {
-    return request(app.getHttpServer())[method](url).set('Cookie', [`access_token=${accessTokenB}`]);
+    return request(app.getHttpServer())
+      [method](url)
+      .set('Cookie', [`access_token=${accessTokenB}`]);
   };
 
   it('/swipe/like (POST) - A likes B', async () => {
-    const res = await getAuthReqA('post', '/swipe/like').send({ targetId: userIdB });
+    const res = await getAuthReqA('post', '/swipe/like').send({
+      targetId: userIdB,
+    });
     expect(res.status).toBe(201);
     expect(res.body.isMatch).toBe(false);
   });
@@ -80,13 +106,22 @@ describe('SwipeModule (e2e)', () => {
       .set('Cookie', [`access_token=${accessTokenA}`])
       .send({ url: 'https://test.com/photo.jpg', isAvatar: true });
 
-    const res = await getAuthReqB('post', '/swipe/like').send({ targetId: userIdA });
+    const res = await getAuthReqB('post', '/swipe/like').send({
+      targetId: userIdA,
+    });
     expect(res.status).toBe(201);
     expect(res.body.isMatch).toBe(true);
     expect(res.body.matchId).toBeDefined();
 
-    const isMatchCreated = await matchRepo.isMatch(userIdA, userIdB);
-    expect(isMatchCreated).toBe(true);
+    const match = await prisma.match.findFirst({
+      where: {
+        OR: [
+          { userAId: userIdA, userBId: userIdB },
+          { userAId: userIdB, userBId: userIdA },
+        ],
+      },
+    });
+    expect(match).toBeDefined();
   });
 
   it('/swipe/rewind (POST) - should block non-premium', async () => {
@@ -95,7 +130,10 @@ describe('SwipeModule (e2e)', () => {
   });
 
   it('/swipe/superlike (POST) - A superlikes B again (already matched)', async () => {
-    const res = await getAuthReqA('post', '/swipe/superlike').send({ targetId: userIdB, message: 'Hello' });
+    const res = await getAuthReqA('post', '/swipe/superlike').send({
+      targetId: userIdB,
+      message: 'Hello',
+    });
     expect(res.status).toBe(201);
     expect(res.body.isMatch).toBe(true); // Because they are already matched
   });

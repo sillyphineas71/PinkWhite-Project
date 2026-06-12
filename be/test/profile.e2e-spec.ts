@@ -16,7 +16,9 @@ describe('ProfileModule (e2e)', () => {
 
     app = moduleFixture.createNestApplication();
     app.use(cookieParser());
-    app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+    app.useGlobalPipes(
+      new ValidationPipe({ whitelist: true, transform: true }),
+    );
     await app.init();
 
     // 1. Register a user to get the token
@@ -34,9 +36,11 @@ describe('ProfileModule (e2e)', () => {
       .post('/auth/login')
       .send({ email, password: 'Password123!' });
 
-    const cookieHeader = (loginRes.headers['set-cookie'] as unknown) as string[];
+    const cookieHeader = loginRes.headers['set-cookie'] as unknown as string[];
     // Extract access_token from cookie
-    const tokenCookie = cookieHeader.find((c: string) => c.startsWith('access_token='));
+    const tokenCookie = cookieHeader.find((c: string) =>
+      c.startsWith('access_token='),
+    );
     if (tokenCookie) {
       accessToken = tokenCookie.split(';')[0].split('=')[1];
     }
@@ -46,30 +50,33 @@ describe('ProfileModule (e2e)', () => {
     await app.close();
   });
 
-  const getAuthReq = (method: 'get' | 'post' | 'patch' | 'put' | 'delete', url: string) => {
-    return request(app.getHttpServer())[method](url).set('Cookie', [`access_token=${accessToken}`]);
+  const getAuthReq = (
+    method: 'get' | 'post' | 'patch' | 'put' | 'delete',
+    url: string,
+  ) => {
+    return request(app.getHttpServer())
+      [method](url)
+      .set('Cookie', [`access_token=${accessToken}`]);
   };
 
   it('/profile/onboarding (POST) - should block underage', async () => {
-    const res = await getAuthReq('post', '/profile/onboarding')
-      .send({
-        fullName: 'Test User',
-        dob: new Date().toISOString(), // 0 years old
-        gender: 'MALE',
-        searchGender: 'FEMALE',
-      });
+    const res = await getAuthReq('post', '/profile/onboarding').send({
+      fullName: 'Test User',
+      dob: new Date().toISOString(), // 0 years old
+      gender: 'MALE',
+      searchGender: 'FEMALE',
+    });
     expect(res.status).toBe(400);
     expect(res.body.message).toBe('Bạn phải đủ 18 tuổi để tham gia');
   });
 
   it('/profile/onboarding (POST) - should succeed', async () => {
-    const res = await getAuthReq('post', '/profile/onboarding')
-      .send({
-        fullName: 'Test User',
-        dob: '2000-01-01T00:00:00Z', // 26 years old
-        gender: 'MALE',
-        searchGender: 'FEMALE',
-      });
+    const res = await getAuthReq('post', '/profile/onboarding').send({
+      fullName: 'Test User',
+      dob: '2000-01-01T00:00:00Z', // 26 years old
+      gender: 'MALE',
+      searchGender: 'FEMALE',
+    });
     expect(res.status).toBe(201);
     expect(res.body.fullName).toBe('Test User');
   });
@@ -81,8 +88,10 @@ describe('ProfileModule (e2e)', () => {
   });
 
   it('/profile/photos/confirm (POST) - should add photo', async () => {
-    const res = await getAuthReq('post', '/profile/photos/confirm')
-      .send({ url: 'https://test.com/photo1.jpg', isAvatar: true });
+    const res = await getAuthReq('post', '/profile/photos/confirm').send({
+      url: 'https://test.com/photo1.jpg',
+      isAvatar: true,
+    });
     expect(res.status).toBe(201);
     expect(res.body.url).toBe('https://test.com/photo1.jpg');
     expect(res.body.isAvatar).toBe(true);
@@ -98,28 +107,36 @@ describe('ProfileModule (e2e)', () => {
   });
 
   it('/profile/bio-interests (PATCH) - should block profanity url', async () => {
-    const res = await getAuthReq('patch', '/profile/bio-interests')
-      .send({ bio: 'Hello www.google.com' });
+    const res = await getAuthReq('patch', '/profile/bio-interests').send({
+      bio: 'Hello www.google.com',
+    });
     expect(res.status).toBe(400);
   });
 
   it('/profile/bio-interests (PATCH) - should succeed', async () => {
-    const res = await getAuthReq('patch', '/profile/bio-interests')
-      .send({ bio: 'Hello World', interestIds: ['id1', 'id2'] });
+    const res = await getAuthReq('patch', '/profile/bio-interests').send({
+      bio: 'Hello World',
+      interestIds: ['id1', 'id2'],
+    });
     expect(res.status).toBe(200);
     expect(res.body.bio).toBe('Hello World');
   });
 
   it('/profile/location (PATCH) - should block isMocked', async () => {
-    const res = await getAuthReq('patch', '/profile/location')
-      .send({ lat: 10, lng: 106, isMocked: true });
+    const res = await getAuthReq('patch', '/profile/location').send({
+      lat: 10,
+      lng: 106,
+      isMocked: true,
+    });
     expect(res.status).toBe(403);
   });
 
   it('/profile/location (PATCH) - should succeed', async () => {
-    const res = await getAuthReq('patch', '/profile/location')
-      .send({ lat: 10, lng: 106, isMocked: false });
+    const res = await getAuthReq('patch', '/profile/location').send({
+      lat: 10,
+      lng: 106,
+      isMocked: false,
+    });
     expect(res.status).toBe(200);
   });
-
 });

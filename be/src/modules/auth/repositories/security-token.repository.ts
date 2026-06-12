@@ -44,14 +44,19 @@ export class SecurityTokenRepository {
     return this.toEntity(token);
   }
 
-  async findByTokenHash(tokenHash: string): Promise<SecurityTokenEntity | null> {
+  async findByTokenHash(
+    tokenHash: string,
+  ): Promise<SecurityTokenEntity | null> {
     const token = await this.prisma.securityToken.findUnique({
       where: { tokenHash },
     });
     return token ? this.toEntity(token) : null;
   }
 
-  async findByUserIdAndType(userId: string, tokenType: string): Promise<SecurityTokenEntity[]> {
+  async findByUserIdAndType(
+    userId: string,
+    tokenType: string,
+  ): Promise<SecurityTokenEntity[]> {
     const tokens = await this.prisma.securityToken.findMany({
       where: { userId, tokenType: tokenType as any },
       orderBy: { createdAt: 'desc' },
@@ -67,7 +72,10 @@ export class SecurityTokenRepository {
     });
   }
 
-  async deleteAllByUserId(userId: string, tx?: Prisma.TransactionClient): Promise<void> {
+  async deleteAllByUserId(
+    userId: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<void> {
     const client = this.client(tx);
     await client.securityToken.updateMany({
       where: { userId, usedAt: null },
@@ -75,7 +83,11 @@ export class SecurityTokenRepository {
     });
   }
 
-  async invalidateByUserIdAndType(userId: string, tokenType: string, tx?: Prisma.TransactionClient): Promise<number> {
+  async invalidateByUserIdAndType(
+    userId: string,
+    tokenType: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<number> {
     const client = this.client(tx);
     const result = await client.securityToken.updateMany({
       where: { userId, tokenType: tokenType as any, usedAt: null },

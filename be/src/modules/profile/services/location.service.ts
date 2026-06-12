@@ -68,7 +68,9 @@ export class LocationService {
   }
 
   async updatePassport(userId: string, dto: UpdatePassportDto): Promise<void> {
-    throw new NotImplementedException('Passport location not implemented in Phase 1');
+    throw new NotImplementedException(
+      'Passport location not implemented in Phase 1',
+    );
   }
 
   async getActiveLocation(

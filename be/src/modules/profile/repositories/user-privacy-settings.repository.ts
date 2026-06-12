@@ -23,7 +23,10 @@ export class UserPrivacySettingsRepository {
     return tx ?? this.prisma;
   }
 
-  async create(userId: string, tx?: Prisma.TransactionClient): Promise<UserPrivacySettingsEntity> {
+  async create(
+    userId: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<UserPrivacySettingsEntity> {
     const client = this.client(tx);
     const settings = await client.userPrivacySettings.create({
       data: {
@@ -40,16 +43,27 @@ export class UserPrivacySettingsRepository {
     return this.toEntity(settings);
   }
 
-  async findByUserId(userId: string): Promise<UserPrivacySettingsEntity | null> {
+  async findByUserId(
+    userId: string,
+  ): Promise<UserPrivacySettingsEntity | null> {
     const settings = await this.prisma.userPrivacySettings.findUnique({
       where: { userId },
     });
     return settings ? this.toEntity(settings) : null;
   }
 
-  async update(userId: string, data: Partial<Omit<UserPrivacySettingsEntity, 'id' | 'userId' | 'createdAt' | 'updatedAt'>>, tx?: Prisma.TransactionClient): Promise<UserPrivacySettingsEntity | null> {
+  async update(
+    userId: string,
+    data: Partial<
+      Omit<
+        UserPrivacySettingsEntity,
+        'id' | 'userId' | 'createdAt' | 'updatedAt'
+      >
+    >,
+    tx?: Prisma.TransactionClient,
+  ): Promise<UserPrivacySettingsEntity | null> {
     const client = this.client(tx);
-    
+
     try {
       const settings = await client.userPrivacySettings.update({
         where: { userId },
@@ -65,7 +79,16 @@ export class UserPrivacySettingsRepository {
     }
   }
 
-  async upsert(userId: string, data: Partial<Omit<UserPrivacySettingsEntity, 'id' | 'userId' | 'createdAt' | 'updatedAt'>>, tx?: Prisma.TransactionClient): Promise<UserPrivacySettingsEntity> {
+  async upsert(
+    userId: string,
+    data: Partial<
+      Omit<
+        UserPrivacySettingsEntity,
+        'id' | 'userId' | 'createdAt' | 'updatedAt'
+      >
+    >,
+    tx?: Prisma.TransactionClient,
+  ): Promise<UserPrivacySettingsEntity> {
     const client = this.client(tx);
     const settings = await client.userPrivacySettings.upsert({
       where: { userId },

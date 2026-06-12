@@ -84,7 +84,11 @@ export class SessionRepository {
     });
   }
 
-  async revokeAllByUserId(userId: string, reason: string = 'logout_all', tx?: Prisma.TransactionClient): Promise<number> {
+  async revokeAllByUserId(
+    userId: string,
+    reason: string = 'logout_all',
+    tx?: Prisma.TransactionClient,
+  ): Promise<number> {
     const client = this.client(tx);
     const result = await client.userSession.updateMany({
       where: { userId, sessionStatus: 'ACTIVE' },
@@ -94,7 +98,9 @@ export class SessionRepository {
         revokedReason: reason,
       },
     });
-    this.logger.debug(`Revoked ${result.count} sessions for user: ${userId} with reason: ${reason}`);
+    this.logger.debug(
+      `Revoked ${result.count} sessions for user: ${userId} with reason: ${reason}`,
+    );
     return result.count;
   }
   async updateTokenHash(
@@ -114,16 +120,14 @@ export class SessionRepository {
     });
   }
 
-  async rotateRefreshTokenHash(
-    params: {
-      sessionId: string;
-      userId: string;
-      oldRefreshTokenHash: string;
-      newRefreshTokenHash: string;
-      now?: Date;
-      tx?: Prisma.TransactionClient;
-    }
-  ): Promise<boolean> {
+  async rotateRefreshTokenHash(params: {
+    sessionId: string;
+    userId: string;
+    oldRefreshTokenHash: string;
+    newRefreshTokenHash: string;
+    now?: Date;
+    tx?: Prisma.TransactionClient;
+  }): Promise<boolean> {
     const client = this.client(params.tx);
     const now = params.now ?? new Date();
 
@@ -146,7 +150,11 @@ export class SessionRepository {
     return result.count === 1;
   }
 
-  async revokeById(id: string, reason: string, tx?: Prisma.TransactionClient): Promise<void> {
+  async revokeById(
+    id: string,
+    reason: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<void> {
     const client = this.client(tx);
     await client.userSession.update({
       where: { id },
@@ -158,8 +166,10 @@ export class SessionRepository {
     });
   }
 
-
-  async markCompromised(id: string, tx?: Prisma.TransactionClient): Promise<void> {
+  async markCompromised(
+    id: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<void> {
     const client = this.client(tx);
     await client.userSession.update({
       where: { id },

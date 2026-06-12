@@ -1,10 +1,18 @@
 import { Body, Controller, Post, UseGuards } from '@nestjs/common';
-import { ApiCookieAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiCookieAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { SwipeService } from '../services/swipe.service';
 import { CreateSwipeDto } from '../dto/create-swipe.dto';
 import { SwipeResponseDto } from '../dto/swipe-response.dto';
 import { JwtAccessGuard } from '../../auth/guards/jwt-access.guard';
-import { CurrentUser, AuthUser } from '../../auth/decorators/current-user.decorator';
+import {
+  CurrentUser,
+  AuthUser,
+} from '../../auth/decorators/current-user.decorator';
 
 @ApiTags('Swipes')
 @ApiCookieAuth()

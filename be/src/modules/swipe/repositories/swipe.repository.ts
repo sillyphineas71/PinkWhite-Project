@@ -46,22 +46,34 @@ export class SwipeRepository {
       }
     }
     this.swipes.set(swipe.id, swipe);
-    this.logger.debug(`[MOCK] Swipe ${action} created: ${swiperId} -> ${targetId}`);
+    this.logger.debug(
+      `[MOCK] Swipe ${action} created: ${swiperId} -> ${targetId}`,
+    );
     return { ...swipe };
   }
 
-  async countActionInLast24h(userId: string, action: 'LIKE' | 'SUPER_LIKE'): Promise<number> {
+  async countActionInLast24h(
+    userId: string,
+    action: 'LIKE' | 'SUPER_LIKE',
+  ): Promise<number> {
     const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
     let count = 0;
     for (const swipe of this.swipes.values()) {
-      if (swipe.swiperId === userId && swipe.action === action && swipe.createdAt >= twentyFourHoursAgo) {
+      if (
+        swipe.swiperId === userId &&
+        swipe.action === action &&
+        swipe.createdAt >= twentyFourHoursAgo
+      ) {
         count++;
       }
     }
     return count;
   }
 
-  async findTargetAction(swiperId: string, targetId: string): Promise<'LIKE' | 'PASS' | 'SUPER_LIKE' | null> {
+  async findTargetAction(
+    swiperId: string,
+    targetId: string,
+  ): Promise<'LIKE' | 'PASS' | 'SUPER_LIKE' | null> {
     for (const swipe of this.swipes.values()) {
       if (swipe.swiperId === swiperId && swipe.targetId === targetId) {
         return swipe.action;
@@ -89,7 +101,10 @@ export class SwipeRepository {
   async findWhoLikedMe(userId: string): Promise<SwipeEntity[]> {
     const result = [];
     for (const swipe of this.swipes.values()) {
-      if (swipe.targetId === userId && (swipe.action === 'LIKE' || swipe.action === 'SUPER_LIKE')) {
+      if (
+        swipe.targetId === userId &&
+        (swipe.action === 'LIKE' || swipe.action === 'SUPER_LIKE')
+      ) {
         result.push({ ...swipe });
       }
     }
@@ -106,23 +121,32 @@ export class SwipeRepository {
     return result.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   }
 
-  async findAllMutualLikesWithoutMatch(): Promise<{ userA: string; userB: string }[]> {
+  async findAllMutualLikesWithoutMatch(): Promise<
+    { userA: string; userB: string }[]
+  > {
     // This is a slow mock implementation just for the cronjob
-    const likes = Array.from(this.swipes.values()).filter(s => s.action === 'LIKE' || s.action === 'SUPER_LIKE');
+    const likes = Array.from(this.swipes.values()).filter(
+      (s) => s.action === 'LIKE' || s.action === 'SUPER_LIKE',
+    );
     const pairs = new Set<string>();
-    
+
     for (const likeA of likes) {
       for (const likeB of likes) {
-        if (likeA.swiperId === likeB.targetId && likeA.targetId === likeB.swiperId) {
+        if (
+          likeA.swiperId === likeB.targetId &&
+          likeA.targetId === likeB.swiperId
+        ) {
           // It's a mutual like
-          const userA = likeA.swiperId < likeB.swiperId ? likeA.swiperId : likeB.swiperId;
-          const userB = likeA.swiperId < likeB.swiperId ? likeB.swiperId : likeA.swiperId;
+          const userA =
+            likeA.swiperId < likeB.swiperId ? likeA.swiperId : likeB.swiperId;
+          const userB =
+            likeA.swiperId < likeB.swiperId ? likeB.swiperId : likeA.swiperId;
           pairs.add(`${userA}:${userB}`);
         }
       }
     }
-    
-    return Array.from(pairs).map(pair => {
+
+    return Array.from(pairs).map((pair) => {
       const [userA, userB] = pair.split(':');
       return { userA, userB };
     });

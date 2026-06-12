@@ -28,13 +28,18 @@ export class PreferenceRepository {
     return [filter];
   }
 
-  private mapGendersToGenderFilter(genders: string[]): 'MALE' | 'FEMALE' | 'NON_BINARY' | 'OTHER' | 'ALL' {
+  private mapGendersToGenderFilter(
+    genders: string[],
+  ): 'MALE' | 'FEMALE' | 'NON_BINARY' | 'OTHER' | 'ALL' {
     if (!genders || genders.length === 0) return 'ALL';
     if (genders.length > 1) return 'ALL';
     return genders[0] as any;
   }
 
-  async create(data: Omit<PreferenceEntity, 'id' | 'createdAt' | 'updatedAt'>, tx?: Prisma.TransactionClient): Promise<PreferenceEntity> {
+  async create(
+    data: Omit<PreferenceEntity, 'id' | 'createdAt' | 'updatedAt'>,
+    tx?: Prisma.TransactionClient,
+  ): Promise<PreferenceEntity> {
     const client = this.client(tx);
     const pref = await client.discoveryPreference.create({
       data: {
@@ -57,14 +62,24 @@ export class PreferenceRepository {
     return pref ? this.toEntity(pref) : null;
   }
 
-  async update(id: string, data: Partial<Omit<PreferenceEntity, 'id' | 'userId' | 'createdAt' | 'updatedAt'>>, tx?: Prisma.TransactionClient): Promise<PreferenceEntity | null> {
+  async update(
+    id: string,
+    data: Partial<
+      Omit<PreferenceEntity, 'id' | 'userId' | 'createdAt' | 'updatedAt'>
+    >,
+    tx?: Prisma.TransactionClient,
+  ): Promise<PreferenceEntity | null> {
     const client = this.client(tx);
-    
+
     const updateData: any = {};
     if (data.minAge !== undefined) updateData.minAge = data.minAge;
     if (data.maxAge !== undefined) updateData.maxAge = data.maxAge;
-    if (data.maxDistance !== undefined) updateData.maxDistanceKm = data.maxDistance;
-    if (data.genderFilter !== undefined) updateData.preferredGenders = this.mapGenderFilterToGenders(data.genderFilter);
+    if (data.maxDistance !== undefined)
+      updateData.maxDistanceKm = data.maxDistance;
+    if (data.genderFilter !== undefined)
+      updateData.preferredGenders = this.mapGenderFilterToGenders(
+        data.genderFilter,
+      );
 
     try {
       const pref = await client.discoveryPreference.update({
@@ -81,7 +96,11 @@ export class PreferenceRepository {
     }
   }
 
-  async upsert(userId: string, data: Omit<PreferenceEntity, 'id' | 'userId' | 'createdAt' | 'updatedAt'>, tx?: Prisma.TransactionClient): Promise<PreferenceEntity> {
+  async upsert(
+    userId: string,
+    data: Omit<PreferenceEntity, 'id' | 'userId' | 'createdAt' | 'updatedAt'>,
+    tx?: Prisma.TransactionClient,
+  ): Promise<PreferenceEntity> {
     const client = this.client(tx);
     const pref = await client.discoveryPreference.upsert({
       where: { userId },
@@ -108,7 +127,9 @@ export class PreferenceRepository {
       userId: pref.userId,
       minAge: pref.minAge,
       maxAge: pref.maxAge,
-      genderFilter: this.mapGendersToGenderFilter(pref.preferredGenders as string[]),
+      genderFilter: this.mapGendersToGenderFilter(
+        pref.preferredGenders as string[],
+      ),
       maxDistance: pref.maxDistanceKm,
       createdAt: pref.createdAt,
       updatedAt: pref.updatedAt,

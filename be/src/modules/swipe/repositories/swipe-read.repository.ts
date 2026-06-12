@@ -15,15 +15,15 @@ export class SwipeReadRepository {
         emailVerifiedAt: true,
         onboardingStatus: true,
         privacySettings: {
-          select: { isHidden: true }
+          select: { isHidden: true },
         },
         location: {
-          select: { activeLocationMode: true }
+          select: { activeLocationMode: true },
         },
         discoveryPreference: {
-          select: { id: true }
-        }
-      }
+          select: { id: true },
+        },
+      },
     });
   }
 
@@ -49,10 +49,16 @@ export class SwipeReadRepository {
         emailVerifiedAt: true,
         onboardingStatus: true,
         privacySettings: {
-          select: { isHidden: true }
+          select: { isHidden: true },
         },
         profile: {
-          select: { id: true, displayName: true, dob: true, gender: true, relationshipGoal: true }
+          select: {
+            id: true,
+            displayName: true,
+            dob: true,
+            gender: true,
+            relationshipGoal: true,
+          },
         },
         photos: {
           where: {
@@ -60,48 +66,60 @@ export class SwipeReadRepository {
             uploadStatus: 'CONFIRMED',
             moderationStatus: 'APPROVED',
             publicUrl: { not: null },
-            NOT: { publicUrl: '' }
+            NOT: { publicUrl: '' },
           },
           select: { id: true },
-          take: 1
-        }
-      }
+          take: 1,
+        },
+      },
     });
   }
 
-  async findCurrentSwipeState(tx: TxClient, requesterId: string, targetUserId: string) {
+  async findCurrentSwipeState(
+    tx: TxClient,
+    requesterId: string,
+    targetUserId: string,
+  ) {
     return tx.swipeState.findUnique({
       where: {
         swiperId_targetUserId: {
           swiperId: requesterId,
-          targetUserId: targetUserId
-        }
-      }
+          targetUserId: targetUserId,
+        },
+      },
     });
   }
 
-  async findReciprocalPositiveState(tx: TxClient, requesterId: string, targetUserId: string) {
+  async findReciprocalPositiveState(
+    tx: TxClient,
+    requesterId: string,
+    targetUserId: string,
+  ) {
     return tx.swipeState.findFirst({
       where: {
         swiperId: targetUserId,
         targetUserId: requesterId,
         currentAction: {
-          in: ['LIKE', 'SUPER_LIKE']
-        }
-      }
+          in: ['LIKE', 'SUPER_LIKE'],
+        },
+      },
     });
   }
 
-  async findBlockEitherDirection(tx: TxClient, requesterId: string, targetUserId: string) {
+  async findBlockEitherDirection(
+    tx: TxClient,
+    requesterId: string,
+    targetUserId: string,
+  ) {
     const block = await tx.userBlock.findFirst({
       where: {
         status: 'ACTIVE',
         OR: [
           { blockerId: requesterId, blockedUserId: targetUserId },
-          { blockerId: targetUserId, blockedUserId: requesterId }
-        ]
+          { blockerId: targetUserId, blockedUserId: requesterId },
+        ],
       },
-      select: { id: true }
+      select: { id: true },
     });
     return block !== null;
   }

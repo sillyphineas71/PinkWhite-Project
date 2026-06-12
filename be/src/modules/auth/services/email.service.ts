@@ -58,7 +58,9 @@ export class EmailService {
       `,
     });
 
-    this.logger.log(`Verification email queued/sent to: ${this.maskEmail(email)}`);
+    this.logger.log(
+      `Verification email queued/sent to: ${this.maskEmail(email)}`,
+    );
   }
 
   /**
@@ -79,6 +81,8 @@ export class EmailService {
       `,
     });
 
-    this.logger.log(`Reset password email queued/sent to: ${this.maskEmail(email)}`);
+    this.logger.log(
+      `Reset password email queued/sent to: ${this.maskEmail(email)}`,
+    );
   }
 }

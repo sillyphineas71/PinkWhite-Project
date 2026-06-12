@@ -3,7 +3,10 @@ import { Type } from 'class-transformer';
 import { IsInt, IsOptional, Max, Min } from 'class-validator';
 
 export class GetFeedQueryDto {
-  @ApiPropertyOptional({ description: 'Số lượng trả về tối đa (tối đa 50)', default: 20 })
+  @ApiPropertyOptional({
+    description: 'Số lượng trả về tối đa (tối đa 50)',
+    default: 20,
+  })
   @IsOptional()
   @Type(() => Number)
   @IsInt()

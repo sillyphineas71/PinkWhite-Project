@@ -25,12 +25,13 @@ export class PhotoRepository {
     userId: string,
     url: string,
     isAvatar: boolean,
-    tx?: Prisma.TransactionClient
+    tx?: Prisma.TransactionClient,
   ): Promise<PhotoEntity> {
     const client = this.client(tx);
 
     const userPhotos = await this.findByUserId(userId);
-    const maxOrder = userPhotos.length > 0 ? Math.max(...userPhotos.map((p) => p.order)) : -1;
+    const maxOrder =
+      userPhotos.length > 0 ? Math.max(...userPhotos.map((p) => p.order)) : -1;
 
     if (isAvatar) {
       await client.profilePhoto.updateMany({
@@ -88,9 +89,13 @@ export class PhotoRepository {
     });
   }
 
-  async updateOrder(userId: string, photoIds: string[], tx?: Prisma.TransactionClient): Promise<void> {
+  async updateOrder(
+    userId: string,
+    photoIds: string[],
+    tx?: Prisma.TransactionClient,
+  ): Promise<void> {
     const client = this.client(tx);
-    
+
     // Process one by one to set correct order and avatar status
     for (let index = 0; index < photoIds.length; index++) {
       const id = photoIds[index];
@@ -104,10 +109,13 @@ export class PhotoRepository {
     }
   }
 
-  async normalizeOrder(userId: string, tx?: Prisma.TransactionClient): Promise<void> {
+  async normalizeOrder(
+    userId: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<void> {
     const client = this.client(tx);
     const userPhotos = await this.findByUserId(userId);
-    
+
     for (let index = 0; index < userPhotos.length; index++) {
       const photo = userPhotos[index];
       await client.profilePhoto.update({

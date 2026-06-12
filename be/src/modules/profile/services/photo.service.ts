@@ -23,7 +23,9 @@ export class PhotoService {
       throw new BadRequestException('Đã đạt giới hạn tối đa 6 ảnh');
     }
 
-    throw new NotImplementedException('S3 presigned URL generation not implemented in Phase 1');
+    throw new NotImplementedException(
+      'S3 presigned URL generation not implemented in Phase 1',
+    );
   }
 
   async confirmUpload(

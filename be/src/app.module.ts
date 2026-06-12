@@ -12,6 +12,7 @@ import { ProfileModule } from './modules/profile/profile.module';
 import { DiscoveryModule } from './modules/discovery/discovery.module';
 import { SwipeModule } from './modules/swipe/swipe.module';
 import { MatchModule } from './modules/match/match.module';
+import { ChatModule } from './modules/chat/chat.module';
 import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
@@ -37,6 +38,7 @@ import { ScheduleModule } from '@nestjs/schedule';
     MatchModule,
     SwipeModule,
     DiscoveryModule,
+    ChatModule,
   ],
 })
 export class AppModule {}

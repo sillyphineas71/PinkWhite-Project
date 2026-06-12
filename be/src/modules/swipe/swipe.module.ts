@@ -12,7 +12,17 @@ import { DatabaseModule } from '../../database/database.module';
 @Module({
   imports: [AuthModule, ProfileModule, MatchModule, DatabaseModule],
   controllers: [SwipeController],
-  providers: [SwipeService, SwipeRepository, SwipeReadRepository, SwipeWriteRepository],
-  exports: [SwipeService, SwipeRepository, SwipeReadRepository, SwipeWriteRepository],
+  providers: [
+    SwipeService,
+    SwipeRepository,
+    SwipeReadRepository,
+    SwipeWriteRepository,
+  ],
+  exports: [
+    SwipeService,
+    SwipeRepository,
+    SwipeReadRepository,
+    SwipeWriteRepository,
+  ],
 })
 export class SwipeModule {}

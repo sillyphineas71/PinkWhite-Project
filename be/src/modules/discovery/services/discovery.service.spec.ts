@@ -47,12 +47,19 @@ describe('DiscoveryService Mapping Privacy', () => {
     service = module.get<DiscoveryService>(DiscoveryService);
 
     // Mock validateRequesterDiscoveryReadiness
-    jest.spyOn(service, 'validateRequesterDiscoveryReadiness').mockResolvedValue({
-      user: { id: 'requester', email: 'secret@email.com' } as any,
-      settings: {} as any,
-      prefs: { preferredGenders: ['ALL'], minAge: 18, maxAge: 99, maxDistanceKm: 100 } as any,
-      location: { latitude: 10, longitude: 10 } as any,
-    });
+    jest
+      .spyOn(service, 'validateRequesterDiscoveryReadiness')
+      .mockResolvedValue({
+        user: { id: 'requester', email: 'secret@email.com' } as any,
+        settings: {} as any,
+        prefs: {
+          preferredGenders: ['ALL'],
+          minAge: 18,
+          maxAge: 99,
+          maxDistanceKm: 100,
+        } as any,
+        location: { latitude: 10, longitude: 10 },
+      });
   });
 
   afterEach(() => {
@@ -61,7 +68,10 @@ describe('DiscoveryService Mapping Privacy', () => {
 
   it('response mapper does not expose sensitive fields', async () => {
     mockFeedRepo.findCandidates.mockResolvedValue([
-      { candidateUserId: '00000000-0000-0000-0000-000000000001', distanceMeters: 12345 },
+      {
+        candidateUserId: '00000000-0000-0000-0000-000000000001',
+        distanceMeters: 12345,
+      },
     ]);
 
     // 25 years old
@@ -106,9 +116,9 @@ describe('DiscoveryService Mapping Privacy', () => {
     query.limit = 20;
 
     const res = await service.getFeed('requester', query);
-    
+
     expect(res.candidates).toHaveLength(1);
-    
+
     const jsonStr = JSON.stringify(res);
     expect(jsonStr).not.toContain('"dob"');
     expect(jsonStr).not.toContain('"email"');
@@ -133,10 +143,22 @@ describe('DiscoveryService Mapping Privacy', () => {
 
   it('distanceMeters maps correctly to distanceKm', async () => {
     mockFeedRepo.findCandidates.mockResolvedValue([
-      { candidateUserId: '00000000-0000-0000-0000-000000000001', distanceMeters: 0 },
-      { candidateUserId: '00000000-0000-0000-0000-000000000002', distanceMeters: 400 },
-      { candidateUserId: '00000000-0000-0000-0000-000000000003', distanceMeters: 600 },
-      { candidateUserId: '00000000-0000-0000-0000-000000000004', distanceMeters: 12000 },
+      {
+        candidateUserId: '00000000-0000-0000-0000-000000000001',
+        distanceMeters: 0,
+      },
+      {
+        candidateUserId: '00000000-0000-0000-0000-000000000002',
+        distanceMeters: 400,
+      },
+      {
+        candidateUserId: '00000000-0000-0000-0000-000000000003',
+        distanceMeters: 600,
+      },
+      {
+        candidateUserId: '00000000-0000-0000-0000-000000000004',
+        distanceMeters: 12000,
+      },
     ]);
 
     const dob = new Date();
@@ -149,10 +171,30 @@ describe('DiscoveryService Mapping Privacy', () => {
       { userId: '00000000-0000-0000-0000-000000000004', dob },
     ]);
     mockPrisma.profilePhoto.findMany.mockResolvedValue([
-      { id: 'p1', userId: '00000000-0000-0000-0000-000000000001', publicUrl: 'safe', sortOrder: 0 },
-      { id: 'p2', userId: '00000000-0000-0000-0000-000000000002', publicUrl: 'safe', sortOrder: 0 },
-      { id: 'p3', userId: '00000000-0000-0000-0000-000000000003', publicUrl: 'safe', sortOrder: 0 },
-      { id: 'p4', userId: '00000000-0000-0000-0000-000000000004', publicUrl: 'safe', sortOrder: 0 },
+      {
+        id: 'p1',
+        userId: '00000000-0000-0000-0000-000000000001',
+        publicUrl: 'safe',
+        sortOrder: 0,
+      },
+      {
+        id: 'p2',
+        userId: '00000000-0000-0000-0000-000000000002',
+        publicUrl: 'safe',
+        sortOrder: 0,
+      },
+      {
+        id: 'p3',
+        userId: '00000000-0000-0000-0000-000000000003',
+        publicUrl: 'safe',
+        sortOrder: 0,
+      },
+      {
+        id: 'p4',
+        userId: '00000000-0000-0000-0000-000000000004',
+        publicUrl: 'safe',
+        sortOrder: 0,
+      },
     ]);
 
     const query = new GetDiscoveryFeedQueryDto();
@@ -172,9 +214,18 @@ describe('DiscoveryService Mapping Privacy', () => {
   it('pagination hasMore and nextCursor behavior', async () => {
     // Repo returns 3 rows (limit + 1)
     mockFeedRepo.findCandidates.mockResolvedValue([
-      { candidateUserId: '00000000-0000-0000-0000-000000000001', distanceMeters: 1000 },
-      { candidateUserId: '00000000-0000-0000-0000-000000000002', distanceMeters: 2000 },
-      { candidateUserId: '00000000-0000-0000-0000-000000000003', distanceMeters: 3000 },
+      {
+        candidateUserId: '00000000-0000-0000-0000-000000000001',
+        distanceMeters: 1000,
+      },
+      {
+        candidateUserId: '00000000-0000-0000-0000-000000000002',
+        distanceMeters: 2000,
+      },
+      {
+        candidateUserId: '00000000-0000-0000-0000-000000000003',
+        distanceMeters: 3000,
+      },
     ]);
 
     const dob = new Date();
@@ -186,9 +237,24 @@ describe('DiscoveryService Mapping Privacy', () => {
       { userId: '00000000-0000-0000-0000-000000000003', dob }, // Prisma might fetch it, but mapping ignores it because it's not in visibleRows
     ]);
     mockPrisma.profilePhoto.findMany.mockResolvedValue([
-      { id: 'p1', userId: '00000000-0000-0000-0000-000000000001', publicUrl: 'safe', sortOrder: 0 },
-      { id: 'p2', userId: '00000000-0000-0000-0000-000000000002', publicUrl: 'safe', sortOrder: 0 },
-      { id: 'p3', userId: '00000000-0000-0000-0000-000000000003', publicUrl: 'safe', sortOrder: 0 },
+      {
+        id: 'p1',
+        userId: '00000000-0000-0000-0000-000000000001',
+        publicUrl: 'safe',
+        sortOrder: 0,
+      },
+      {
+        id: 'p2',
+        userId: '00000000-0000-0000-0000-000000000002',
+        publicUrl: 'safe',
+        sortOrder: 0,
+      },
+      {
+        id: 'p3',
+        userId: '00000000-0000-0000-0000-000000000003',
+        publicUrl: 'safe',
+        sortOrder: 0,
+      },
     ]);
 
     const query = new GetDiscoveryFeedQueryDto();
@@ -199,24 +265,36 @@ describe('DiscoveryService Mapping Privacy', () => {
     expect(res.hasMore).toBe(true);
     expect(res.nextCursor).toBeDefined();
     expect(res.nextCursor).not.toBeNull();
-    
+
     // nextCursor should come from c2, distance 2000
     const decoded = decodeDiscoveryCursor(res.nextCursor!);
-    expect(decoded!.candidateUserId).toBe('00000000-0000-0000-0000-000000000002');
+    expect(decoded!.candidateUserId).toBe(
+      '00000000-0000-0000-0000-000000000002',
+    );
     expect(decoded!.distanceMeters).toBe(2000);
   });
 
   it('nextCursor is null when no more rows', async () => {
     mockFeedRepo.findCandidates.mockResolvedValue([
-      { candidateUserId: '00000000-0000-0000-0000-000000000001', distanceMeters: 1000 },
+      {
+        candidateUserId: '00000000-0000-0000-0000-000000000001',
+        distanceMeters: 1000,
+      },
     ]);
 
     const dob = new Date();
     dob.setFullYear(dob.getFullYear() - 20);
 
-    mockPrisma.profile.findMany.mockResolvedValue([{ userId: '00000000-0000-0000-0000-000000000001', dob }]);
+    mockPrisma.profile.findMany.mockResolvedValue([
+      { userId: '00000000-0000-0000-0000-000000000001', dob },
+    ]);
     mockPrisma.profilePhoto.findMany.mockResolvedValue([
-      { id: 'p1', userId: '00000000-0000-0000-0000-000000000001', publicUrl: 'safe', sortOrder: 0 },
+      {
+        id: 'p1',
+        userId: '00000000-0000-0000-0000-000000000001',
+        publicUrl: 'safe',
+        sortOrder: 0,
+      },
     ]);
 
     const query = new GetDiscoveryFeedQueryDto();
@@ -230,35 +308,68 @@ describe('DiscoveryService Mapping Privacy', () => {
 
   it('date-aware age edge cases', async () => {
     mockFeedRepo.findCandidates.mockResolvedValue([
-      { candidateUserId: '00000000-0000-0000-0000-000000000001', distanceMeters: 100 },
-      { candidateUserId: '00000000-0000-0000-0000-000000000002', distanceMeters: 100 },
+      {
+        candidateUserId: '00000000-0000-0000-0000-000000000001',
+        distanceMeters: 100,
+      },
+      {
+        candidateUserId: '00000000-0000-0000-0000-000000000002',
+        distanceMeters: 100,
+      },
     ]);
 
     const now = new Date();
-    
+
     // Birthday already happened this year
-    const dob1 = new Date(now.getFullYear() - 25, now.getMonth() - 1, now.getDate());
+    const dob1 = new Date(
+      now.getFullYear() - 25,
+      now.getMonth() - 1,
+      now.getDate(),
+    );
     // Birthday has not happened this year
-    const dob2 = new Date(now.getFullYear() - 25, now.getMonth() + 1, now.getDate());
+    const dob2 = new Date(
+      now.getFullYear() - 25,
+      now.getMonth() + 1,
+      now.getDate(),
+    );
 
     mockPrisma.profile.findMany.mockResolvedValue([
       { userId: '00000000-0000-0000-0000-000000000001', dob: dob1 },
       { userId: '00000000-0000-0000-0000-000000000002', dob: dob2 },
     ]);
     mockPrisma.profilePhoto.findMany.mockResolvedValue([
-      { id: 'p1', userId: '00000000-0000-0000-0000-000000000001', publicUrl: 'safe', sortOrder: 0 },
-      { id: 'p2', userId: '00000000-0000-0000-0000-000000000002', publicUrl: 'safe', sortOrder: 0 },
+      {
+        id: 'p1',
+        userId: '00000000-0000-0000-0000-000000000001',
+        publicUrl: 'safe',
+        sortOrder: 0,
+      },
+      {
+        id: 'p2',
+        userId: '00000000-0000-0000-0000-000000000002',
+        publicUrl: 'safe',
+        sortOrder: 0,
+      },
     ]);
 
-    const res = await service.getFeed('requester', new GetDiscoveryFeedQueryDto());
+    const res = await service.getFeed(
+      'requester',
+      new GetDiscoveryFeedQueryDto(),
+    );
     expect(res.candidates[0].age).toBe(25);
     expect(res.candidates[1].age).toBe(24);
   });
 
   it('publicUrl null photo is excluded and candidate without safe public photos is excluded', async () => {
     mockFeedRepo.findCandidates.mockResolvedValue([
-      { candidateUserId: '00000000-0000-0000-0000-000000000001', distanceMeters: 100 },
-      { candidateUserId: '00000000-0000-0000-0000-000000000002', distanceMeters: 100 },
+      {
+        candidateUserId: '00000000-0000-0000-0000-000000000001',
+        distanceMeters: 100,
+      },
+      {
+        candidateUserId: '00000000-0000-0000-0000-000000000002',
+        distanceMeters: 100,
+      },
     ]);
 
     const dob = new Date(2000, 1, 1);
@@ -268,17 +379,40 @@ describe('DiscoveryService Mapping Privacy', () => {
     ]);
 
     mockPrisma.profilePhoto.findMany.mockResolvedValue([
-      { id: 'p1', userId: '00000000-0000-0000-0000-000000000001', publicUrl: 'safe_url', storageKey: 'leak1', sortOrder: 0 },
-      { id: 'p2', userId: '00000000-0000-0000-0000-000000000001', publicUrl: null, storageKey: 'leak2', sortOrder: 1 },
-      { id: 'p3', userId: '00000000-0000-0000-0000-000000000002', publicUrl: null, storageKey: 'leak3', sortOrder: 0 },
+      {
+        id: 'p1',
+        userId: '00000000-0000-0000-0000-000000000001',
+        publicUrl: 'safe_url',
+        storageKey: 'leak1',
+        sortOrder: 0,
+      },
+      {
+        id: 'p2',
+        userId: '00000000-0000-0000-0000-000000000001',
+        publicUrl: null,
+        storageKey: 'leak2',
+        sortOrder: 1,
+      },
+      {
+        id: 'p3',
+        userId: '00000000-0000-0000-0000-000000000002',
+        publicUrl: null,
+        storageKey: 'leak3',
+        sortOrder: 0,
+      },
     ]);
 
-    const res = await service.getFeed('requester', new GetDiscoveryFeedQueryDto());
-    
+    const res = await service.getFeed(
+      'requester',
+      new GetDiscoveryFeedQueryDto(),
+    );
+
     // c1 is included but its null publicUrl photo is excluded
     // c2 is excluded entirely because it has no safe public photos
     expect(res.candidates).toHaveLength(1);
-    expect(res.candidates[0].userId).toBe('00000000-0000-0000-0000-000000000001');
+    expect(res.candidates[0].userId).toBe(
+      '00000000-0000-0000-0000-000000000001',
+    );
     expect(res.candidates[0].photos).toHaveLength(1);
     expect(res.candidates[0].photos[0].url).toBe('safe_url');
     expect(JSON.stringify(res)).not.toContain('leak');
@@ -287,7 +421,7 @@ describe('DiscoveryService Mapping Privacy', () => {
 
 describe('DiscoveryService Readiness and Gender Normalization', () => {
   let service: DiscoveryService;
-  
+
   const mockUserRepo = { findById: jest.fn() };
   const mockPrivacyRepo = { findByUserId: jest.fn() };
   const mockPrisma = {
@@ -322,66 +456,102 @@ describe('DiscoveryService Readiness and Gender Normalization', () => {
   describe('Gender Normalization', () => {
     it('ALL gender maps to lowercase DB values', async () => {
       // Mock readiness
-      jest.spyOn(service, 'validateRequesterDiscoveryReadiness').mockResolvedValue({
-        user: {} as any,
-        settings: {} as any,
-        prefs: { preferredGenders: ['ALL'], minAge: 18, maxAge: 99, maxDistanceKm: 100 } as any,
-        location: { latitude: 10, longitude: 10 } as any,
-      });
+      jest
+        .spyOn(service, 'validateRequesterDiscoveryReadiness')
+        .mockResolvedValue({
+          user: {} as any,
+          settings: {} as any,
+          prefs: {
+            preferredGenders: ['ALL'],
+            minAge: 18,
+            maxAge: 99,
+            maxDistanceKm: 100,
+          } as any,
+          location: { latitude: 10, longitude: 10 },
+        });
 
       mockFeedRepo.findCandidates.mockResolvedValue([]);
-      
+
       const query = new GetDiscoveryFeedQueryDto();
       await service.getFeed('req', query);
 
-      expect(mockFeedRepo.findCandidates).toHaveBeenCalledWith(expect.objectContaining({
-        preferredGenders: ['male', 'female', 'non_binary', 'other']
-      }));
+      expect(mockFeedRepo.findCandidates).toHaveBeenCalledWith(
+        expect.objectContaining({
+          preferredGenders: ['male', 'female', 'non_binary', 'other'],
+        }),
+      );
     });
 
     it('Multiple concrete preferred genders are preserved and normalized', async () => {
-      jest.spyOn(service, 'validateRequesterDiscoveryReadiness').mockResolvedValue({
-        user: {} as any,
-        settings: {} as any,
-        prefs: { preferredGenders: ['MALE', 'NON_BINARY'], minAge: 18, maxAge: 99, maxDistanceKm: 100 } as any,
-        location: { latitude: 10, longitude: 10 } as any,
-      });
+      jest
+        .spyOn(service, 'validateRequesterDiscoveryReadiness')
+        .mockResolvedValue({
+          user: {} as any,
+          settings: {} as any,
+          prefs: {
+            preferredGenders: ['MALE', 'NON_BINARY'],
+            minAge: 18,
+            maxAge: 99,
+            maxDistanceKm: 100,
+          } as any,
+          location: { latitude: 10, longitude: 10 },
+        });
 
       mockFeedRepo.findCandidates.mockResolvedValue([]);
-      
+
       const query = new GetDiscoveryFeedQueryDto();
       await service.getFeed('req', query);
 
-      expect(mockFeedRepo.findCandidates).toHaveBeenCalledWith(expect.objectContaining({
-        preferredGenders: ['male', 'non_binary']
-      }));
+      expect(mockFeedRepo.findCandidates).toHaveBeenCalledWith(
+        expect.objectContaining({
+          preferredGenders: ['male', 'non_binary'],
+        }),
+      );
     });
   });
 
   describe('Location Readiness', () => {
     beforeEach(() => {
-      mockUserRepo.findById.mockResolvedValue({ accountStatus: 'ACTIVE', deletedAt: null, isEmailVerified: true, isOnboarded: true });
+      mockUserRepo.findById.mockResolvedValue({
+        accountStatus: 'ACTIVE',
+        deletedAt: null,
+        isEmailVerified: true,
+        isOnboarded: true,
+      });
       mockPrivacyRepo.findByUserId.mockResolvedValue({ isHidden: false });
-      mockPrisma.discoveryPreference.findUnique.mockResolvedValue({ preferredGenders: ['MALE'] });
+      mockPrisma.discoveryPreference.findUnique.mockResolvedValue({
+        preferredGenders: ['MALE'],
+      });
     });
 
     it('accepts active_location_mode = REAL with real_location present', async () => {
-      mockPrisma.$queryRaw.mockResolvedValue([{ active_location_mode: 'real', lng: 10, lat: 10 }]);
-      
-      const readiness = await service.validateRequesterDiscoveryReadiness('req');
+      mockPrisma.$queryRaw.mockResolvedValue([
+        { active_location_mode: 'real', lng: 10, lat: 10 },
+      ]);
+
+      const readiness =
+        await service.validateRequesterDiscoveryReadiness('req');
       expect(readiness.location).toEqual({ latitude: 10, longitude: 10 });
     });
 
     it('rejects active_location_mode = REAL with real_location null', async () => {
-      mockPrisma.$queryRaw.mockResolvedValue([{ active_location_mode: 'real', lng: null, lat: null }]);
-      
-      await expect(service.validateRequesterDiscoveryReadiness('req')).rejects.toThrow('LOCATION_REQUIRED');
+      mockPrisma.$queryRaw.mockResolvedValue([
+        { active_location_mode: 'real', lng: null, lat: null },
+      ]);
+
+      await expect(
+        service.validateRequesterDiscoveryReadiness('req'),
+      ).rejects.toThrow('LOCATION_REQUIRED');
     });
 
     it('rejects non-REAL location mode', async () => {
-      mockPrisma.$queryRaw.mockResolvedValue([{ active_location_mode: 'passport', lng: 10, lat: 10 }]);
-      
-      await expect(service.validateRequesterDiscoveryReadiness('req')).rejects.toThrow('LOCATION_REQUIRED');
+      mockPrisma.$queryRaw.mockResolvedValue([
+        { active_location_mode: 'passport', lng: 10, lat: 10 },
+      ]);
+
+      await expect(
+        service.validateRequesterDiscoveryReadiness('req'),
+      ).rejects.toThrow('LOCATION_REQUIRED');
     });
   });
 });

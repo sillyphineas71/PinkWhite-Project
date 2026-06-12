@@ -70,7 +70,6 @@ export class ProfileController {
     return { ...profile, photos, location };
   }
 
-
   @Patch('basic-info')
   @ApiOperation({ summary: 'UC018: Cập nhật thông tin cơ bản (DOB, Gender)' })
   async updateBasicInfo(

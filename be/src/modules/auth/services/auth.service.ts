@@ -150,10 +150,7 @@ export class AuthService {
     }
 
     // SUSPENDED or BANNED -> blocked
-    if (
-      user.accountStatus === 'SUSPENDED' ||
-      user.accountStatus === 'BANNED'
-    ) {
+    if (user.accountStatus === 'SUSPENDED' || user.accountStatus === 'BANNED') {
       throw new UnauthorizedException('Email hoặc mật khẩu không chính xác');
     }
 
@@ -179,7 +176,7 @@ export class AuthService {
       user.email,
       res,
       req,
-      isPendingRestore ? 'pending_restore' : 'normal'
+      isPendingRestore ? 'pending_restore' : 'normal',
     );
 
     this.logger.log(
@@ -264,10 +261,14 @@ export class AuthService {
       user &&
       !user.isEmailVerified &&
       !user.deletedAt &&
-      (user.accountStatus === 'ACTIVE' || user.accountStatus === 'PENDING_EMAIL_VERIFICATION')
+      (user.accountStatus === 'ACTIVE' ||
+        user.accountStatus === 'PENDING_EMAIL_VERIFICATION')
     ) {
       // Invalidate old tokens
-      await this.securityTokenRepo.invalidateByUserIdAndType(user.id, 'EMAIL_VERIFICATION');
+      await this.securityTokenRepo.invalidateByUserIdAndType(
+        user.id,
+        'EMAIL_VERIFICATION',
+      );
 
       const token = generateSecureToken();
       const tokenHash = hashToken(token);
@@ -300,15 +301,21 @@ export class AuthService {
       storedToken.tokenType !== 'EMAIL_VERIFICATION' ||
       storedToken.usedAt
     ) {
-      throw new BadRequestException('Token xác thực không hợp lệ hoặc đã hết hạn');
+      throw new BadRequestException(
+        'Token xác thực không hợp lệ hoặc đã hết hạn',
+      );
     }
     if (storedToken.expiresAt < new Date()) {
-      throw new BadRequestException('Token xác thực không hợp lệ hoặc đã hết hạn');
+      throw new BadRequestException(
+        'Token xác thực không hợp lệ hoặc đã hết hạn',
+      );
     }
 
     const user = await this.userRepo.findById(storedToken.userId);
     if (!user || user.email !== normalized) {
-      throw new BadRequestException('Token xác thực không hợp lệ hoặc đã hết hạn');
+      throw new BadRequestException(
+        'Token xác thực không hợp lệ hoặc đã hết hạn',
+      );
     }
 
     if (
@@ -317,7 +324,9 @@ export class AuthService {
       user.accountStatus === 'SUSPENDED' ||
       user.accountStatus === 'DELETED'
     ) {
-      throw new BadRequestException('Token xác thực không hợp lệ hoặc đã hết hạn');
+      throw new BadRequestException(
+        'Token xác thực không hợp lệ hoặc đã hết hạn',
+      );
     }
 
     // Transaction: verify + create session
@@ -332,7 +341,9 @@ export class AuthService {
         data: { usedAt: new Date() },
       });
       if (result.count !== 1) {
-        throw new BadRequestException('Token xác thực không hợp lệ hoặc đã hết hạn');
+        throw new BadRequestException(
+          'Token xác thực không hợp lệ hoặc đã hết hạn',
+        );
       }
 
       // Update user
@@ -368,9 +379,13 @@ export class AuthService {
     if (
       user &&
       !user.deletedAt &&
-      (user.accountStatus === 'ACTIVE' || user.accountStatus === 'PENDING_EMAIL_VERIFICATION')
+      (user.accountStatus === 'ACTIVE' ||
+        user.accountStatus === 'PENDING_EMAIL_VERIFICATION')
     ) {
-      await this.securityTokenRepo.invalidateByUserIdAndType(user.id, 'PASSWORD_RESET');
+      await this.securityTokenRepo.invalidateByUserIdAndType(
+        user.id,
+        'PASSWORD_RESET',
+      );
 
       const token = generateSecureToken();
       const tokenHash = hashToken(token);
@@ -408,15 +423,21 @@ export class AuthService {
       storedToken.tokenType !== 'PASSWORD_RESET' ||
       storedToken.usedAt
     ) {
-      throw new BadRequestException('Token đặt lại mật khẩu không hợp lệ hoặc đã hết hạn');
+      throw new BadRequestException(
+        'Token đặt lại mật khẩu không hợp lệ hoặc đã hết hạn',
+      );
     }
     if (storedToken.expiresAt < new Date()) {
-      throw new BadRequestException('Token đặt lại mật khẩu không hợp lệ hoặc đã hết hạn');
+      throw new BadRequestException(
+        'Token đặt lại mật khẩu không hợp lệ hoặc đã hết hạn',
+      );
     }
 
     const user = await this.userRepo.findById(storedToken.userId);
     if (!user) {
-      throw new BadRequestException('Token đặt lại mật khẩu không hợp lệ hoặc đã hết hạn');
+      throw new BadRequestException(
+        'Token đặt lại mật khẩu không hợp lệ hoặc đã hết hạn',
+      );
     }
 
     if (
@@ -425,7 +446,9 @@ export class AuthService {
       user.accountStatus === 'SUSPENDED' ||
       user.accountStatus === 'DELETED'
     ) {
-      throw new BadRequestException('Token đặt lại mật khẩu không hợp lệ hoặc đã hết hạn');
+      throw new BadRequestException(
+        'Token đặt lại mật khẩu không hợp lệ hoặc đã hết hạn',
+      );
     }
 
     const passwordHash = await hashPassword(trimmed, this.bcryptRounds);
@@ -440,7 +463,9 @@ export class AuthService {
         data: { usedAt: new Date() },
       });
       if (result.count !== 1) {
-        throw new BadRequestException('Token đặt lại mật khẩu không hợp lệ hoặc đã hết hạn');
+        throw new BadRequestException(
+          'Token đặt lại mật khẩu không hợp lệ hoặc đã hết hạn',
+        );
       }
 
       const updateResult = await tx.authIdentity.updateMany({
@@ -448,7 +473,9 @@ export class AuthService {
         data: { passwordHash },
       });
       if (updateResult.count === 0) {
-        throw new BadRequestException('Token đặt lại mật khẩu không hợp lệ hoặc đã hết hạn');
+        throw new BadRequestException(
+          'Token đặt lại mật khẩu không hợp lệ hoặc đã hết hạn',
+        );
       }
     });
 
@@ -599,9 +626,13 @@ export class AuthService {
     let sessionCount = 0;
     await this.prisma.$transaction(async (tx: any) => {
       await this.userRepo.softDelete(userId, tx);
-      sessionCount = await this.sessionRepo.revokeAllByUserId(userId, 'account_deleted', tx);
+      sessionCount = await this.sessionRepo.revokeAllByUserId(
+        userId,
+        'account_deleted',
+        tx,
+      );
     });
-    
+
     this.tokenService.clearAuthCookies(res);
 
     this.logger.log(
@@ -629,7 +660,10 @@ export class AuthService {
       throw new BadRequestException('Tài khoản không cần khôi phục');
     }
 
-    if (!user.deletionScheduledAt || user.deletionScheduledAt.getTime() < Date.now()) {
+    if (
+      !user.deletionScheduledAt ||
+      user.deletionScheduledAt.getTime() < Date.now()
+    ) {
       throw new GoneException('Tài khoản đã bị xóa vĩnh viễn');
     }
 
@@ -706,8 +740,12 @@ export class AuthService {
       auth_context: payload.auth_context || 'normal',
     };
 
-    const newAccessToken = this.tokenService.signAccessToken(newAccessTokenPayload);
-    const newRefreshToken = this.tokenService.signRefreshToken(newRefreshTokenPayload);
+    const newAccessToken = this.tokenService.signAccessToken(
+      newAccessTokenPayload,
+    );
+    const newRefreshToken = this.tokenService.signRefreshToken(
+      newRefreshTokenPayload,
+    );
     const newHash = hashToken(newRefreshToken);
 
     const success = await this.sessionRepo.rotateRefreshTokenHash({
@@ -737,7 +775,10 @@ export class AuthService {
 
   // ===== UC015: Force Logout All =====
   async forceLogoutAll(userId: string, res: Response) {
-    const sessionCount = await this.sessionRepo.revokeAllByUserId(userId, 'logout_all');
+    const sessionCount = await this.sessionRepo.revokeAllByUserId(
+      userId,
+      'logout_all',
+    );
     this.tokenService.clearAuthCookies(res);
 
     this.logger.log(
@@ -782,7 +823,8 @@ export class AuthService {
     };
 
     const accessToken = this.tokenService.signAccessToken(accessTokenPayload);
-    const refreshToken = this.tokenService.signRefreshToken(refreshTokenPayload);
+    const refreshToken =
+      this.tokenService.signRefreshToken(refreshTokenPayload);
 
     // Step 3: Hash the real refresh token
     const refreshTokenHash = hashToken(refreshToken);
@@ -793,7 +835,7 @@ export class AuthService {
       userId,
       refreshTokenHash,
       userAgent: req.headers['user-agent'],
-      ipAddress: req.socket?.remoteAddress as string | undefined,
+      ipAddress: req.socket?.remoteAddress,
       expiresAt: this.tokenService.getRefreshTokenExpiry(),
     });
 

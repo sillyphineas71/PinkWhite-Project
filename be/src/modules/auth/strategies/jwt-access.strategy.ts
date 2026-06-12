@@ -1,4 +1,8 @@
-import { Injectable, UnauthorizedException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  UnauthorizedException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
@@ -32,10 +36,16 @@ export class JwtAccessStrategy extends PassportStrategy(
         '/auth/logout',
         '/api/auth/logout',
       ];
-      
-      const isAllowed = req.method === 'POST' && allowedPaths.some(path => req.path === path || req.path.endsWith(path));
+
+      const isAllowed =
+        req.method === 'POST' &&
+        allowedPaths.some(
+          (path) => req.path === path || req.path.endsWith(path),
+        );
       if (!isAllowed) {
-        throw new ForbiddenException('Tài khoản đang chờ khôi phục, không thể truy cập API này');
+        throw new ForbiddenException(
+          'Tài khoản đang chờ khôi phục, không thể truy cập API này',
+        );
       }
     }
 

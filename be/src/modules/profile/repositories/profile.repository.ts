@@ -31,7 +31,10 @@ export class ProfileRepository {
     return tx ?? this.prisma;
   }
 
-  async create(data: Partial<ProfileEntity>, tx?: Prisma.TransactionClient): Promise<ProfileEntity> {
+  async create(
+    data: Partial<ProfileEntity>,
+    tx?: Prisma.TransactionClient,
+  ): Promise<ProfileEntity> {
     const client = this.client(tx);
     const profile = await client.profile.create({
       data: {
@@ -64,10 +67,10 @@ export class ProfileRepository {
   async update(
     userId: string,
     data: Partial<ProfileEntity>,
-    tx?: Prisma.TransactionClient
+    tx?: Prisma.TransactionClient,
   ): Promise<ProfileEntity | null> {
     const client = this.client(tx);
-    
+
     // Convert entity data to Prisma data
     const updateData: any = {};
     if (data.fullName !== undefined) updateData.displayName = data.fullName;
@@ -87,7 +90,12 @@ export class ProfileRepository {
       this.logger.debug(`Profile updated for userId: ${userId}`);
       return this.toEntity(profile);
     } catch (error) {
-      if (error && typeof error === 'object' && 'code' in error && error.code === 'P2025') {
+      if (
+        error &&
+        typeof error === 'object' &&
+        'code' in error &&
+        error.code === 'P2025'
+      ) {
         return null;
       }
       throw error;
