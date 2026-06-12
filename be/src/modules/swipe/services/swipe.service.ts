@@ -1,237 +1,167 @@
-import {
-  BadRequestException,
-  ForbiddenException,
-  Injectable,
-  Logger,
-} from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
-import { SwipeRepository } from '../repositories/swipe.repository';
-import { MatchRepository } from '../../match/repositories/match.repository';
-import { UserRepository } from '../../auth/repositories/user.repository';
-import { ProfileRepository } from '../../profile/repositories/profile.repository';
-import { PhotoRepository } from '../../profile/repositories/photo.repository';
+import { Injectable } from '@nestjs/common';
+import { CreateSwipeDto } from '../dto/create-swipe.dto';
+import { SwipeResponseDto } from '../dto/swipe-response.dto';
+import { PrismaService } from '../../../database/prisma.service';
+import { Prisma } from '@prisma/client';
+
+type TxClient = Prisma.TransactionClient;
+import { SwipeReadRepository } from '../repositories/swipe-read.repository';
+import { SwipeWriteRepository } from '../repositories/swipe-write.repository';
+import { MatchWriteRepository } from '../../match/repositories/match-write.repository';
+import { MatchCreationService } from '../../match/services/match-creation.service';
+import { MatchException, MatchErrorCode } from '../../match/match.types';
+import { SwipeException, SwipeErrorCode } from '../swipe.types';
 
 @Injectable()
 export class SwipeService {
-  private readonly logger = new Logger(SwipeService.name);
-
   constructor(
-    private readonly swipeRepo: SwipeRepository,
-    private readonly matchRepo: MatchRepository,
-    private readonly userRepo: UserRepository,
-    private readonly profileRepo: ProfileRepository,
-    private readonly photoRepo: PhotoRepository,
+    private readonly prisma: PrismaService,
+    private readonly swipeReadRepo: SwipeReadRepository,
+    private readonly swipeWriteRepo: SwipeWriteRepository,
+    private readonly matchWriteRepo: MatchWriteRepository,
+    private readonly matchCreationService: MatchCreationService,
   ) {}
 
-  private hasProfanityOrUrl(text: string): boolean {
-    const urlRegex = /(https?:\/\/[^\s]+)|(www\.[^\s]+)|([a-zA-Z0-9-]+\.[a-zA-Z]{2,})/g;
-    const bannedWords = ['fuck', 'bitch', 'onlyfans'];
+  async processSwipe(requesterId: string, dto: CreateSwipeDto): Promise<SwipeResponseDto> {
+    const { targetUserId, action } = dto;
 
-    if (urlRegex.test(text)) return true;
-    for (const word of bannedWords) {
-      if (text.toLowerCase().includes(word)) return true;
+    const allowedActions = ['PASS', 'LIKE', 'SUPER_LIKE'];
+    if (!allowedActions.includes(action)) {
+      throw new SwipeException(SwipeErrorCode.INVALID_SWIPE_ACTION);
     }
-    return false;
-  }
 
-  async like(userId: string, targetId: string) {
-    if (userId === targetId) throw new BadRequestException('Cannot swipe yourself');
+    // 1. Reject self swipe.
+    if (requesterId === targetUserId) {
+      throw new SwipeException(SwipeErrorCode.SELF_SWIPE_NOT_ALLOWED);
+    }
 
-    const user = await this.userRepo.findById(userId);
-    if (!user) throw new BadRequestException('User not found');
-
-    const target = await this.userRepo.findById(targetId);
-    if (!target) throw new BadRequestException('Target user not found');
-    if (target.isHidden) throw new BadRequestException('Target user is not available');
-
-    const targetPhotos = await this.photoRepo.findByUserId(targetId);
-    if (targetPhotos.length === 0) throw new BadRequestException('Target user has no photos');
-
-    // Check limit
-    if (!user.isPremium) {
-      const likesToday = await this.swipeRepo.countActionInLast24h(userId, 'LIKE');
-      if (likesToday >= 100) {
-        throw new ForbiddenException('Bạn đã hết 100 lượt Thích hôm nay. Hãy nâng cấp Premium.');
+    return this.prisma.$transaction(async (tx: TxClient) => {
+      // 2. Validate requester eligibility.
+      const requester = await this.swipeReadRepo.findRequesterEligibility(tx, requesterId);
+      if (
+        !requester ||
+        requester.accountStatus !== 'ACTIVE' ||
+        requester.deletedAt !== null ||
+        requester.emailVerifiedAt === null ||
+        requester.onboardingStatus !== 'COMPLETED' ||
+        !requester.privacySettings ||
+        requester.privacySettings.isHidden === true ||
+        !requester.location ||
+        requester.location.activeLocationMode !== 'REAL' ||
+        !requester.discoveryPreference
+      ) {
+        throw new SwipeException(SwipeErrorCode.SWIPE_NOT_ALLOWED);
       }
-    }
 
-    const currentSwipe = await this.swipeRepo.findTargetAction(userId, targetId);
-    if (currentSwipe === 'LIKE') return { isMatch: await this.matchRepo.isMatch(userId, targetId) };
+      const hasRealLocation = await this.swipeReadRepo.hasActiveRealLocation(tx, requesterId);
+      if (!hasRealLocation) {
+        throw new SwipeException(SwipeErrorCode.SWIPE_NOT_ALLOWED);
+      }
 
-    await this.swipeRepo.create(userId, targetId, 'LIKE');
+      // 3. Validate target eligibility.
+      const target = await this.swipeReadRepo.findTargetEligibility(tx, targetUserId);
+      if (
+        !target ||
+        target.accountStatus !== 'ACTIVE' ||
+        target.deletedAt !== null ||
+        target.emailVerifiedAt === null ||
+        target.onboardingStatus !== 'COMPLETED' ||
+        !target.privacySettings ||
+        target.privacySettings.isHidden === true ||
+        !target.profile ||
+        !target.profile.displayName ||
+        target.profile.displayName.trim() === '' ||
+        !target.profile.dob ||
+        !target.profile.gender ||
+        !target.profile.relationshipGoal ||
+        !target.photos ||
+        target.photos.length === 0
+      ) {
+        throw new SwipeException(SwipeErrorCode.TARGET_NOT_AVAILABLE);
+      }
 
-    // Check Mutual Like
-    const targetAction = await this.swipeRepo.findTargetAction(targetId, userId);
-    if (targetAction === 'LIKE' || targetAction === 'SUPER_LIKE') {
+      // 4. Check block either direction.
+      const isBlocked = await this.swipeReadRepo.findBlockEitherDirection(tx, requesterId, targetUserId);
+      if (isBlocked) {
+        throw new SwipeException(SwipeErrorCode.TARGET_NOT_AVAILABLE);
+      }
+
+      // 4.5 Acquire pair-level lock to prevent concurrent match creation race conditions.
+      await this.matchWriteRepo.acquirePairTransactionLock(tx, requesterId, targetUserId);
+
+      // 5. Check any existing match record.
+      const existingMatch = await this.matchWriteRepo.findMatchByPair(tx, requesterId, targetUserId);
+      if (existingMatch) {
+        if (existingMatch.status === 'ACTIVE') {
+          throw new SwipeException(SwipeErrorCode.ALREADY_MATCHED);
+        } else {
+          throw new SwipeException(SwipeErrorCode.TARGET_NOT_AVAILABLE);
+        }
+      }
+
+      // 7. Check current swipe_state requester -> target.
+      const currentState = await this.swipeReadRepo.findCurrentSwipeState(tx, requesterId, targetUserId);
+
+      // 8. If currentAction equals requested action (Idempotent success)
+      // Note: cast currentState.currentAction because Prisma defines CurrentSwipeAction for state but SwipeAction for events
+      if (currentState && currentState.currentAction as string === action) {
+        return {
+          targetUserId,
+          action,
+          matched: false,
+          matchId: null
+        };
+      }
+
+      // 9. If currentAction differs or no state exists
+      const now = new Date();
+      const actionForPrisma = action as any;
+      const event = await this.swipeWriteRepo.createSwipeEvent(tx, requesterId, targetUserId, actionForPrisma, now);
+      await this.swipeWriteRepo.upsertSwipeState(tx, requesterId, targetUserId, actionForPrisma, event.id, now);
+
+      // 10. If action is PASS
+      if (action === 'PASS') {
+        return {
+          targetUserId,
+          action,
+          matched: false,
+          matchId: null
+        };
+      }
+
+      // 11. If action is LIKE/SUPER_LIKE: check reciprocal positive state target -> requester
+      const reciprocalState = await this.swipeReadRepo.findReciprocalPositiveState(tx, requesterId, targetUserId);
+      
+      // 12. If no reciprocal positive
+      if (!reciprocalState) {
+        return {
+          targetUserId,
+          action,
+          matched: false,
+          matchId: null
+        };
+      }
+
+      // 13. If reciprocal positive exists: call MatchCreationService inside same transaction
       try {
-        const match = await this.matchRepo.create(userId, targetId);
-        return { isMatch: true, matchId: match.id };
-      } catch (error) {
-        if (error.message === 'UNIQUE_VIOLATION') {
-          // Race condition resolved by unique constraint
-          return { isMatch: true };
+        const match = await this.matchCreationService.createMatchPair(tx, {
+          requesterId,
+          targetUserId,
+          occurredAt: now,
+        });
+
+        return {
+          targetUserId,
+          action,
+          matched: true,
+          matchId: match.id
+        };
+      } catch (error: any) {
+        if (error instanceof MatchException && error.code === MatchErrorCode.TARGET_NOT_AVAILABLE) {
+          throw new SwipeException(SwipeErrorCode.TARGET_NOT_AVAILABLE);
         }
         throw error;
       }
-    }
-
-    return { isMatch: false };
-  }
-
-  async pass(userId: string, targetId: string) {
-    if (userId === targetId) throw new BadRequestException('Cannot swipe yourself');
-    await this.swipeRepo.create(userId, targetId, 'PASS');
-    return { success: true };
-  }
-
-  async superLike(userId: string, targetId: string, message: string | null = null) {
-    if (userId === targetId) throw new BadRequestException('Cannot swipe yourself');
-
-    const user = await this.userRepo.findById(userId);
-    if (!user) throw new BadRequestException('User not found');
-
-    const limit = user.isPremium ? 5 : 1;
-    const superLikesToday = await this.swipeRepo.countActionInLast24h(userId, 'SUPER_LIKE');
-
-    if (superLikesToday >= limit) {
-      throw new ForbiddenException(`Bạn đã hết lượt Super Like hôm nay (${limit} lượt).`);
-    }
-
-    if (message && this.hasProfanityOrUrl(message)) {
-      throw new BadRequestException('Nội dung vi phạm tiêu chuẩn cộng đồng (chứa từ cấm hoặc đường link)');
-    }
-
-    const currentSwipe = await this.swipeRepo.findTargetAction(userId, targetId);
-    if (currentSwipe === 'SUPER_LIKE') return { isMatch: await this.matchRepo.isMatch(userId, targetId) };
-
-    await this.swipeRepo.create(userId, targetId, 'SUPER_LIKE', message);
-
-    // Check Mutual Like
-    const targetAction = await this.swipeRepo.findTargetAction(targetId, userId);
-    if (targetAction === 'LIKE' || targetAction === 'SUPER_LIKE') {
-      try {
-        const match = await this.matchRepo.create(userId, targetId);
-        return { isMatch: true, matchId: match.id };
-      } catch (error) {
-        if (error.message === 'UNIQUE_VIOLATION') {
-          return { isMatch: true };
-        }
-        throw error;
-      }
-    }
-
-    return { isMatch: false };
-  }
-
-  async rewind(userId: string) {
-    const user = await this.userRepo.findById(userId);
-    if (!user?.isPremium) {
-      throw new ForbiddenException('Chức năng Rewind chỉ dành cho thành viên Premium');
-    }
-
-    const lastSwipe = await this.swipeRepo.findLastSwipe(userId);
-    if (!lastSwipe) {
-      throw new BadRequestException('Không có lượt quẹt nào để quay lại');
-    }
-
-    const isMatch = await this.matchRepo.isMatch(userId, lastSwipe.targetId);
-    if (isMatch) {
-      throw new BadRequestException('Không thể Rewind người đã Match');
-    }
-
-    await this.swipeRepo.delete(lastSwipe.id);
-    return { success: true, rewoundTargetId: lastSwipe.targetId };
-  }
-
-  async getRemainingLikes(userId: string) {
-    const user = await this.userRepo.findById(userId);
-    if (!user) throw new BadRequestException('User not found');
-
-    const likesToday = await this.swipeRepo.countActionInLast24h(userId, 'LIKE');
-    const superLikesToday = await this.swipeRepo.countActionInLast24h(userId, 'SUPER_LIKE');
-
-    const superLikeLimit = user.isPremium ? 5 : 1;
-
-    return {
-      likesRemaining: user.isPremium ? 'UNLIMITED' : Math.max(0, 100 - likesToday),
-      superLikesRemaining: Math.max(0, superLikeLimit - superLikesToday),
-      isPremium: user.isPremium,
-    };
-  }
-
-  async getWhoLikedMe(userId: string) {
-    const user = await this.userRepo.findById(userId);
-    if (!user) throw new BadRequestException('User not found');
-
-    const likes = await this.swipeRepo.findWhoLikedMe(userId);
-    const allProfiles = await this.profileRepo.findAll();
-    const allPhotos = await this.photoRepo.findAll();
-
-    return {
-      count: likes.length,
-      data: likes.map(like => {
-        const profile = allProfiles.find(p => p.userId === like.swiperId);
-        const photos = allPhotos.filter(p => p.userId === like.swiperId);
-        
-        return {
-          userId: user.isPremium ? like.swiperId : 'HIDDEN',
-          fullName: user.isPremium ? profile?.fullName : 'Người dùng ẩn danh',
-          action: like.action,
-          message: user.isPremium ? like.message : null,
-          timestamp: like.createdAt,
-          // Blurry image mock logic would be handled by frontend usually, but we can send a blurred URL or original
-          avatarUrl: user.isPremium ? (photos.find(p => p.isAvatar)?.url || null) : 'BLURRED_URL',
-        };
-      }),
-    };
-  }
-
-  async getPassHistory(userId: string) {
-    const user = await this.userRepo.findById(userId);
-    if (!user) throw new BadRequestException('User not found');
-
-    const passes = await this.swipeRepo.findPassHistory(userId);
-    const allProfiles = await this.profileRepo.findAll();
-    const allPhotos = await this.photoRepo.findAll();
-
-    const retentionDays = user.isPremium ? 30 : 7;
-    const cutoffDate = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000);
-
-    const filteredPasses = passes.filter(p => p.createdAt >= cutoffDate);
-
-    return {
-      data: filteredPasses.map(pass => {
-        const profile = allProfiles.find(p => p.userId === pass.targetId);
-        const photos = allPhotos.filter(p => p.userId === pass.targetId);
-        return {
-          userId: pass.targetId,
-          fullName: profile?.fullName,
-          age: profile ? new Date().getFullYear() - profile.dob.getFullYear() : null,
-          timestamp: pass.createdAt,
-          avatarUrl: photos.find(p => p.isAvatar)?.url || null,
-        };
-      }),
-    };
-  }
-
-  // Self-Healing Cronjob (UC047 Flaw 2)
-  @Cron(CronExpression.EVERY_10_MINUTES)
-  async healMutualLikes() {
-    this.logger.log('Running Self-Healing Cronjob for Mutual Likes...');
-    const mutualLikes = await this.swipeRepo.findAllMutualLikesWithoutMatch();
-    let healedCount = 0;
-
-    for (const pair of mutualLikes) {
-      const isMatch = await this.matchRepo.isMatch(pair.userA, pair.userB);
-      if (!isMatch) {
-        try {
-          await this.matchRepo.create(pair.userA, pair.userB);
-          healedCount++;
-        } catch (error) {
-          // Ignore unique violations
-        }
-      }
-    }
-    this.logger.log(`Self-Healing completed. Healed ${healedCount} missing matches.`);
+    });
   }
 }
